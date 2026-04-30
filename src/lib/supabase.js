@@ -212,6 +212,42 @@ export const resendSignupConfirmation = async (email) => request('/auth/v1/resen
   },
 });
 
+export const callSupabaseFunction = async (name, body, session = getStoredSession()) => {
+  requireConfig();
+
+  if (!session?.access_token) {
+    throw new Error('Sign in before continuing.');
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  return parseResponse(response);
+};
+
+export const createRazorpayOrder = async ({ amount, currency = 'INR' }, session = getStoredSession()) => (
+  callSupabaseFunction('razorpay-payment', {
+    action: 'create_order',
+    amount,
+    currency,
+    receipt: `aura_${Date.now()}`,
+  }, session)
+);
+
+export const verifyRazorpayPayment = async (payment, session = getStoredSession()) => (
+  callSupabaseFunction('razorpay-payment', {
+    action: 'verify_payment',
+    payment,
+  }, session)
+);
+
 export const restRequest = async (path, options = {}, session = getStoredSession()) => {
   const headers = {
     Prefer: options.prefer || 'return=representation',

@@ -1,1 +1,1 @@
-export { createOrder, listOrders } from '../services/orders';
+export { createOrder, fromOrderRow, listOrders } from '../services/orders';

@@ -18,9 +18,14 @@ export const fromOrderRow = (row) => ({
   shipping: Number(row.shipping || 0),
   total: Number(row.total || 0),
   status: row.status || 'Placed',
+  paymentProvider: row.payment_provider || '',
+  paymentStatus: row.payment_status || '',
+  razorpayOrderId: row.razorpay_order_id || '',
+  razorpayPaymentId: row.razorpay_payment_id || '',
+  razorpaySignature: row.razorpay_signature || '',
 });
 
-export const createOrder = async ({ user, cart, subtotal, shipping, total }) => {
+export const createOrder = async ({ user, cart, subtotal, shipping, total, payment = {} }) => {
   const rows = await restRequest('/orders', {
     method: 'POST',
     body: {
@@ -42,6 +47,11 @@ export const createOrder = async ({ user, cart, subtotal, shipping, total }) => 
       shipping,
       total,
       status: 'Placed',
+      payment_provider: payment.provider || 'razorpay',
+      payment_status: payment.status || 'paid',
+      razorpay_order_id: payment.razorpayOrderId || payment.razorpay_order_id || null,
+      razorpay_payment_id: payment.razorpayPaymentId || payment.razorpay_payment_id || null,
+      razorpay_signature: payment.razorpaySignature || payment.razorpay_signature || null,
     },
   });
 

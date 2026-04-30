@@ -4,7 +4,29 @@ import { Trash2 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { createOrder } from '../utils/orders';
+import { createRazorpayOrder, verifyRazorpayPayment } from '../lib/supabase';
 import ProductArt from '../components/ProductArt';
+
+const loadRazorpayCheckout = () => new Promise((resolve, reject) => {
+  if (window.Razorpay) {
+    resolve(true);
+    return;
+  }
+
+  const existingScript = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+  if (existingScript) {
+    existingScript.addEventListener('load', () => resolve(true), { once: true });
+    existingScript.addEventListener('error', () => reject(new Error('Could not load Razorpay checkout.')), { once: true });
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+  script.async = true;
+  script.onload = () => resolve(true);
+  script.onerror = () => reject(new Error('Could not load Razorpay checkout.'));
+  document.body.appendChild(script);
+});
 
 const Cart = () => {
   const { cart, removeFromCart, updateQuantity, clearCart, cartTotal } = useCart();
@@ -30,19 +52,84 @@ const Cart = () => {
     setPlacingOrder(true);
 
     try {
-      const order = await createOrder({
-        user,
-        cart,
-        subtotal: cartTotal,
-        shipping,
-        total: orderTotal,
+      const checkoutCart = cart.map(item => ({ ...item }));
+      const checkoutSubtotal = cartTotal;
+      const checkoutShipping = shipping;
+      const checkoutTotal = orderTotal;
+
+      await loadRazorpayCheckout();
+
+      const razorpayOrder = await createRazorpayOrder({
+        amount: checkoutTotal,
+        currency: 'INR',
       });
 
-      clearCart();
-      setPlacedOrderId(order.orderNumber);
+      const options = {
+        key: razorpayOrder.keyId,
+        amount: razorpayOrder.amount,
+        currency: razorpayOrder.currency || 'INR',
+        name: 'Aura By Yash',
+        description: 'Aura order payment',
+        order_id: razorpayOrder.id,
+        prefill: {
+          name: user.username || user.name || '',
+          email: user.email || '',
+          contact: user.phone || '',
+        },
+        notes: {
+          customer_id: user.id,
+        },
+        theme: {
+          color: '#111111',
+        },
+        handler: async (paymentResponse) => {
+          try {
+            const verification = await verifyRazorpayPayment(paymentResponse);
+
+            if (!verification.valid) {
+              throw new Error('Payment verification failed. Please contact support.');
+            }
+
+            const order = await createOrder({
+              user,
+              cart: checkoutCart,
+              subtotal: checkoutSubtotal,
+              shipping: checkoutShipping,
+              total: checkoutTotal,
+              payment: {
+                provider: 'razorpay',
+                status: 'paid',
+                razorpayOrderId: paymentResponse.razorpay_order_id,
+                razorpayPaymentId: paymentResponse.razorpay_payment_id,
+                razorpaySignature: paymentResponse.razorpay_signature,
+              },
+            });
+
+            clearCart();
+            setPlacedOrderId(order.orderNumber);
+            setCheckoutMessage(`Payment successful. Order ${order.orderNumber} placed.`);
+          } catch (err) {
+            setCheckoutError(err.message);
+          } finally {
+            setPlacingOrder(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setCheckoutError('Payment cancelled. Your order was not placed.');
+            setPlacingOrder(false);
+          },
+        },
+      };
+
+      const checkout = new window.Razorpay(options);
+      checkout.on('payment.failed', (response) => {
+        setCheckoutError(response.error?.description || 'Payment failed. Please try again.');
+        setPlacingOrder(false);
+      });
+      checkout.open();
     } catch (err) {
       setCheckoutError(err.message);
-    } finally {
       setPlacingOrder(false);
     }
   };
@@ -117,7 +204,7 @@ const Cart = () => {
                   </button>
                 )}
                 <button className="btn-dark" style={{ width: '100%' }} onClick={handleCheckout} disabled={placingOrder || !isEmailConfirmed}>
-                  {placingOrder ? 'Placing Order...' : 'Checkout'}
+                  {placingOrder ? 'Opening Payment...' : 'Checkout'}
                 </button>
               </>
             ) : (

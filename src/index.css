@@ -678,6 +678,20 @@ footer { background: var(--white); color: var(--black); padding: 50px 50px 24px;
   letter-spacing: 2px;
   text-transform: uppercase;
 }
+.admin-payment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 12px;
+  color: var(--gray-dark);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.admin-payment-meta span {
+  border: 1px solid var(--gray-mid);
+  padding: 4px 8px;
+  word-break: break-word;
+}
 .admin-order-items {
   display: flex;
   flex-direction: column;

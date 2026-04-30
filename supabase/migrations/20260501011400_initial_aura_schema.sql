@@ -105,9 +105,24 @@ create table if not exists public.orders (
   shipping numeric(10,2) not null default 0,
   total numeric(10,2) not null default 0,
   status text not null default 'Placed',
+  payment_provider text not null default 'razorpay',
+  payment_status text not null default 'pending',
+  razorpay_order_id text,
+  razorpay_payment_id text,
+  razorpay_signature text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.orders
+add column if not exists payment_provider text not null default 'razorpay',
+add column if not exists payment_status text not null default 'pending',
+add column if not exists razorpay_order_id text,
+add column if not exists razorpay_payment_id text,
+add column if not exists razorpay_signature text;
+
+create index if not exists orders_razorpay_order_id_idx on public.orders (razorpay_order_id);
+create index if not exists orders_razorpay_payment_id_idx on public.orders (razorpay_payment_id);
 
 alter table public.profiles enable row level security;
 alter table public.products enable row level security;

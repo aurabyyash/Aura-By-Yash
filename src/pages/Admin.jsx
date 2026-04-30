@@ -156,9 +156,15 @@ const Admin = () => {
                   <div>
                     <p className="admin-order-id">{order.orderNumber}</p>
                     <p className="admin-order-meta">{order.customerName} / {order.customerEmail}</p>
+                    {order.customerPhone && <p className="admin-order-meta">Phone: {order.customerPhone}</p>}
                     <p className="admin-order-meta">{order.date}</p>
                   </div>
                   <span className="admin-order-status">{order.status}</span>
+                </div>
+
+                <div className="admin-payment-meta">
+                  <span>{order.paymentStatus ? `Payment: ${order.paymentStatus}` : 'Payment: Not recorded'}</span>
+                  {order.razorpayPaymentId && <span>ID: {order.razorpayPaymentId}</span>}
                 </div>
 
                 <div className="admin-order-items">
