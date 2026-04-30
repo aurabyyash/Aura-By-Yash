@@ -1,0 +1,57 @@
+import { restRequest } from '../lib/supabase';
+
+const createOrderNumber = () => {
+  const date = new Date().toISOString().slice(0, 10).replaceAll('-', '');
+  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `AURA-${date}-${suffix}`;
+};
+
+export const fromOrderRow = (row) => ({
+  id: row.order_number,
+  orderNumber: row.order_number,
+  customerName: row.customer_name,
+  customerEmail: row.customer_email,
+  customerPhone: row.customer_phone,
+  date: new Date(row.created_at).toLocaleString(),
+  items: row.items || [],
+  subtotal: Number(row.subtotal || 0),
+  shipping: Number(row.shipping || 0),
+  total: Number(row.total || 0),
+  status: row.status || 'Placed',
+});
+
+export const createOrder = async ({ user, cart, subtotal, shipping, total }) => {
+  const rows = await restRequest('/orders', {
+    method: 'POST',
+    body: {
+      order_number: createOrderNumber(),
+      user_id: user.id,
+      customer_email: user.email,
+      customer_name: user.username || user.name || user.email,
+      customer_phone: user.phone || '',
+      items: cart.map(item => ({
+        id: item.id,
+        name: item.name,
+        categoryId: item.categoryId,
+        price: Number(item.price || 0),
+        quantity: item.quantity,
+        imageUrl: item.imageUrl || '',
+        imageUrls: item.imageUrls || (item.imageUrl ? [item.imageUrl] : []),
+      })),
+      subtotal,
+      shipping,
+      total,
+      status: 'Placed',
+    },
+  });
+
+  return fromOrderRow(rows[0]);
+};
+
+export const listOrders = async () => {
+  const rows = await restRequest('/orders?select=*&order=created_at.desc', {
+    headers: { Prefer: '' },
+  });
+
+  return rows.map(fromOrderRow);
+};
