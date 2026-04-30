@@ -1,8 +1,15 @@
 export const ADMIN_EMAIL = 'yashsain684@gmail.com';
 export const ADMIN_PASSWORD = 'Yashsain684@gmail.com';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const DEFAULT_SUPABASE_URL = 'https://vfowybrltwgeajtbwqvf.supabase.co';
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_qrXSKHg3imF31IYUKkPXUg_ZZDnv3o5';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+  || import.meta.env.NEXT_PUBLIC_SUPABASE_URL
+  || DEFAULT_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+  || import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  || DEFAULT_SUPABASE_PUBLISHABLE_KEY;
 const SESSION_KEY = 'aura-supabase-session';
 const STORAGE_BUCKET = 'product-images';
 
