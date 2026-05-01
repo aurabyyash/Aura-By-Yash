@@ -13,10 +13,10 @@ const AllProducts = () => {
     window.scrollTo(0, 0);
   }, []);
 
-  if (loading) return <div style={{ padding: '80px 50px' }}>Loading...</div>;
+  if (loading) return <div className="page-loading">Loading...</div>;
 
   return (
-    <div style={{ padding: '40px 50px' }}>
+    <div className="catalog-page">
       <p className="section-eyebrow"><Link to="/" className="text-link">Home</Link> / All Products</p>
       <h2 className="section-title">Shop <em>Everything</em></h2>
       

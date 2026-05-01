@@ -25,10 +25,10 @@ const Category = () => {
     window.scrollTo(0, 0);
   }, [categoryId, products, loading]);
 
-  if (loading) return <div style={{ padding: '80px 50px' }}>Loading...</div>;
+  if (loading) return <div className="page-loading">Loading...</div>;
 
   return (
-    <div style={{ padding: '40px 50px' }}>
+    <div className="catalog-page">
       <p className="section-eyebrow"><Link to="/" className="text-link">Home</Link> / {categoryName}</p>
       <h2 className="section-title">Shop <em>{categoryName}</em></h2>
       

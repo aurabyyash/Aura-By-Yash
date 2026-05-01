@@ -32,7 +32,7 @@ const ProductDetail = () => {
     }
   };
 
-  if (!product) return <div style={{ padding: '80px 50px' }}>Loading...</div>;
+  if (!product) return <div className="page-loading">Loading...</div>;
 
   return (
     <div className="product-detail-container">
