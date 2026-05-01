@@ -110,6 +110,9 @@ create table if not exists public.orders (
   razorpay_order_id text,
   razorpay_payment_id text,
   razorpay_signature text,
+  completed_at timestamptz,
+  completion_email_sent boolean not null default false,
+  completion_email_error text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -119,10 +122,14 @@ add column if not exists payment_provider text not null default 'razorpay',
 add column if not exists payment_status text not null default 'pending',
 add column if not exists razorpay_order_id text,
 add column if not exists razorpay_payment_id text,
-add column if not exists razorpay_signature text;
+add column if not exists razorpay_signature text,
+add column if not exists completed_at timestamptz,
+add column if not exists completion_email_sent boolean not null default false,
+add column if not exists completion_email_error text;
 
 create index if not exists orders_razorpay_order_id_idx on public.orders (razorpay_order_id);
 create index if not exists orders_razorpay_payment_id_idx on public.orders (razorpay_payment_id);
+create index if not exists orders_status_created_at_idx on public.orders (status, created_at desc);
 
 alter table public.profiles enable row level security;
 alter table public.products enable row level security;

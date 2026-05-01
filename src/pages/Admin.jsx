@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Edit2, PlusCircle, Trash2 } from 'lucide-react';
+import { CheckCircle2, Edit2, PlusCircle, Trash2 } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
 import { useAuth } from '../context/AuthContext';
-import { listOrders } from '../utils/orders';
+import { completeOrder, listOrders } from '../utils/orders';
 import { listCustomers } from '../services/profiles';
 import ProductArt from '../components/ProductArt';
 import { uploadProductImages } from '../lib/supabase';
@@ -24,16 +24,20 @@ const emptyProduct = {
   isLtd: false,
 };
 
+const formatCurrency = (value) => `Rs. ${Number(value || 0).toLocaleString('en-IN')}`;
+
 const Admin = () => {
   const { isAdmin, loading: authLoading } = useAuth();
   const { products, loading, error: productError, addProduct, updateProduct, deleteProduct } = useProducts();
   const [orders, setOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [dashboardError, setDashboardError] = useState('');
+  const [dashboardMessage, setDashboardMessage] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState(emptyProduct);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [savingProduct, setSavingProduct] = useState(false);
+  const [completingOrder, setCompletingOrder] = useState('');
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -48,6 +52,7 @@ const Admin = () => {
         setOrders(nextOrders);
         setCustomers(nextCustomers);
         setDashboardError('');
+        setDashboardMessage('');
       } catch (err) {
         setDashboardError(err.message);
       }
@@ -130,59 +135,128 @@ const Admin = () => {
     });
   };
 
+  const handleCompleteOrder = async (order) => {
+    if (!window.confirm(`Mark ${order.orderNumber} as packed and ready to ship?`)) {
+      return;
+    }
+
+    setCompletingOrder(order.orderNumber);
+    setDashboardError('');
+    setDashboardMessage('');
+
+    try {
+      const result = await completeOrder(order);
+      setOrders(currentOrders => currentOrders.map(currentOrder => (
+        currentOrder.orderNumber === order.orderNumber ? result.order : currentOrder
+      )));
+
+      if (result.mail.sent) {
+        setDashboardMessage(`Order ${order.orderNumber} moved to completed and mail sent to ${order.customerEmail}.`);
+      } else {
+        setDashboardError(`Order ${order.orderNumber} moved to completed, but mail was not sent: ${result.mail.message}`);
+      }
+    } catch (err) {
+      setDashboardError(err.message);
+    } finally {
+      setCompletingOrder('');
+    }
+  };
+
+  const recentOrders = orders.filter(order => order.status.toLowerCase() !== 'completed');
+  const completedOrders = orders.filter(order => order.status.toLowerCase() === 'completed');
+
+  const renderOrderCard = (order, isCompleted = false) => (
+    <article key={order.orderNumber} className={`admin-order ${isCompleted ? 'is-completed' : ''}`}>
+      <div className="admin-order-top">
+        <div>
+          <p className="admin-order-id">{order.orderNumber}</p>
+          <p className="admin-order-meta">{order.customerName} / {order.customerEmail}</p>
+          {order.customerPhone && <p className="admin-order-meta">Phone: {order.customerPhone}</p>}
+          <p className="admin-order-meta">{order.date}</p>
+          {order.completedAt && <p className="admin-order-meta">Completed: {order.completedAt}</p>}
+        </div>
+        <div className="admin-order-actions">
+          <span className="admin-order-status">{order.status}</span>
+          {!isCompleted && (
+            <button
+              className="admin-complete-btn"
+              type="button"
+              onClick={() => handleCompleteOrder(order)}
+              disabled={completingOrder === order.orderNumber}
+              title="Mark order packed and ready to ship"
+            >
+              <CheckCircle2 size={16} />
+              {completingOrder === order.orderNumber ? 'Saving' : 'Complete'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="admin-payment-meta">
+        <span>{order.paymentStatus ? `Payment: ${order.paymentStatus}` : 'Payment: Not recorded'}</span>
+        {order.razorpayPaymentId && <span>ID: {order.razorpayPaymentId}</span>}
+        {isCompleted && (
+          <span>{order.completionEmailSent ? 'Mail: Sent' : `Mail: ${order.completionEmailError || 'Pending setup'}`}</span>
+        )}
+      </div>
+
+      <div className="admin-order-items">
+        {order.items.map((item, index) => (
+          <div key={`${order.orderNumber}-${item.id}-${index}`} className="admin-order-item">
+            <span>{item.name}</span>
+            <span>x{item.quantity}</span>
+            <span>{formatCurrency(Number(item.price || 0) * Number(item.quantity || 0))}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="admin-order-total">
+        <span>Total</span>
+        <strong>{formatCurrency(order.total)}</strong>
+      </div>
+    </article>
+  );
+
   return (
     <div className="admin-page">
       <h1 className="section-title">Aura <em>Admin</em></h1>
 
       {productError && <p className="admin-alert">{productError}</p>}
       {dashboardError && <p className="admin-alert">{dashboardError}</p>}
+      {dashboardMessage && <p className="admin-success">{dashboardMessage}</p>}
 
       <section className="admin-orders">
         <div className="admin-section-heading">
           <div>
             <p className="section-eyebrow">Customer Activity</p>
-            <h3>Orders</h3>
+            <h3>Recent Orders</h3>
           </div>
-          <span>{orders.length} Total</span>
+          <span>{recentOrders.length} Active</span>
         </div>
 
-        {orders.length === 0 ? (
-          <div className="admin-empty">No orders placed yet.</div>
+        {recentOrders.length === 0 ? (
+          <div className="admin-empty">No recent orders waiting to be packed.</div>
         ) : (
           <div className="admin-order-list">
-            {orders.map(order => (
-              <article key={order.orderNumber} className="admin-order">
-                <div className="admin-order-top">
-                  <div>
-                    <p className="admin-order-id">{order.orderNumber}</p>
-                    <p className="admin-order-meta">{order.customerName} / {order.customerEmail}</p>
-                    {order.customerPhone && <p className="admin-order-meta">Phone: {order.customerPhone}</p>}
-                    <p className="admin-order-meta">{order.date}</p>
-                  </div>
-                  <span className="admin-order-status">{order.status}</span>
-                </div>
+            {recentOrders.map(order => renderOrderCard(order))}
+          </div>
+        )}
+      </section>
 
-                <div className="admin-payment-meta">
-                  <span>{order.paymentStatus ? `Payment: ${order.paymentStatus}` : 'Payment: Not recorded'}</span>
-                  {order.razorpayPaymentId && <span>ID: {order.razorpayPaymentId}</span>}
-                </div>
+      <section className="admin-orders">
+        <div className="admin-section-heading">
+          <div>
+            <p className="section-eyebrow">Order Complete</p>
+            <h3>Confirmed Orders</h3>
+          </div>
+          <span>{completedOrders.length} Completed</span>
+        </div>
 
-                <div className="admin-order-items">
-                  {order.items.map(item => (
-                    <div key={`${order.orderNumber}-${item.id}`} className="admin-order-item">
-                      <span>{item.name}</span>
-                      <span>x{item.quantity}</span>
-                      <span>&#8377;{item.price * item.quantity}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="admin-order-total">
-                  <span>Total</span>
-                  <strong>&#8377;{order.total}</strong>
-                </div>
-              </article>
-            ))}
+        {completedOrders.length === 0 ? (
+          <div className="admin-empty">No completed orders yet.</div>
+        ) : (
+          <div className="admin-order-list">
+            {completedOrders.map(order => renderOrderCard(order, true))}
           </div>
         )}
       </section>

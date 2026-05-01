@@ -1,4 +1,4 @@
-import { restRequest } from '../lib/supabase';
+import { restRequest, sendOrderCompletionMail } from '../lib/supabase';
 
 const createOrderNumber = () => {
   const date = new Date().toISOString().slice(0, 10).replaceAll('-', '');
@@ -18,6 +18,9 @@ export const fromOrderRow = (row) => ({
   shipping: Number(row.shipping || 0),
   total: Number(row.total || 0),
   status: row.status || 'Placed',
+  completedAt: row.completed_at ? new Date(row.completed_at).toLocaleString() : '',
+  completionEmailSent: Boolean(row.completion_email_sent),
+  completionEmailError: row.completion_email_error || '',
   paymentProvider: row.payment_provider || '',
   paymentStatus: row.payment_status || '',
   razorpayOrderId: row.razorpay_order_id || '',
@@ -56,6 +59,42 @@ export const createOrder = async ({ user, cart, subtotal, shipping, total, payme
   });
 
   return fromOrderRow(rows[0]);
+};
+
+export const completeOrder = async (order) => {
+  const orderFilter = encodeURIComponent(order.orderNumber);
+  const completedAt = new Date().toISOString();
+  const [completedRow] = await restRequest(`/orders?order_number=eq.${orderFilter}`, {
+    method: 'PATCH',
+    body: {
+      status: 'Completed',
+      completed_at: completedAt,
+      completion_email_sent: false,
+      completion_email_error: null,
+    },
+  });
+
+  const completedOrder = fromOrderRow(completedRow);
+  let mailResult = { sent: false, message: 'Email provider is not configured.' };
+
+  try {
+    mailResult = await sendOrderCompletionMail(completedOrder);
+  } catch (err) {
+    mailResult = { sent: false, message: err.message };
+  }
+
+  const [finalRow] = await restRequest(`/orders?order_number=eq.${orderFilter}`, {
+    method: 'PATCH',
+    body: {
+      completion_email_sent: Boolean(mailResult.sent),
+      completion_email_error: mailResult.sent ? null : mailResult.message,
+    },
+  });
+
+  return {
+    order: fromOrderRow(finalRow),
+    mail: mailResult,
+  };
 };
 
 export const listOrders = async () => {

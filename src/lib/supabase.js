@@ -255,6 +255,19 @@ export const verifyRazorpayPayment = async (payment, session = getStoredSession(
   }, session)
 );
 
+export const sendOrderCompletionMail = async (order, session = getStoredSession()) => (
+  callSupabaseFunction('order-mailer', {
+    type: 'order_completed',
+    order: {
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      total: order.total,
+      items: order.items,
+    },
+  }, session)
+);
+
 export const restRequest = async (path, options = {}, session = getStoredSession()) => {
   const headers = {
     Prefer: options.prefer || 'return=representation',

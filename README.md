@@ -16,4 +16,6 @@ For redeploying the Razorpay Edge Function, set these Supabase function secrets:
 ```bash
 RAZORPAY_KEY_ID=rzp_test_SjqUDrxfrYV6wX
 RAZORPAY_KEY_SECRET=<your Razorpay secret>
+RESEND_API_KEY=<your Resend API key for order emails>
+ORDER_MAIL_FROM="Aura By Yash <orders@yourdomain.com>"
 ```
