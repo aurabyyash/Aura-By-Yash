@@ -6,7 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import { completeOrder, listOrders } from '../utils/orders';
 import { listCustomers } from '../services/profiles';
 import ProductArt from '../components/ProductArt';
-import { getFrontMedia, saveFrontMedia, uploadFrontMedia, uploadProductImages } from '../lib/supabase';
+import { createCategoryId } from '../services/categories';
+import { getFrontMedia, saveFrontMedia, uploadCategoryImage, uploadFrontMedia, uploadProductImages } from '../lib/supabase';
 
 const emptyProduct = {
   id: '',
@@ -24,13 +25,31 @@ const emptyProduct = {
   isLtd: false,
 };
 
+const emptyCategory = {
+  id: '',
+  name: '',
+  imageUrl: '',
+  sortOrder: 0,
+};
+
 const formatCurrency = (value) => `Rs. ${Number(value || 0).toLocaleString('en-IN')}`;
 const videoMediaPattern = /\.(mp4|webm|ogg|ogv|mov|m4v)(\?|#|$)/i;
 const isVideoMedia = (source = '', type = '') => type.startsWith('video/') || videoMediaPattern.test(source);
 
 const Admin = () => {
   const { isAdmin, loading: authLoading } = useAuth();
-  const { products, loading, error: productError, addProduct, updateProduct, deleteProduct } = useProducts();
+  const {
+    products,
+    categories,
+    loading,
+    error: productError,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+  } = useProducts();
   const [orders, setOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [dashboardError, setDashboardError] = useState('');
@@ -39,9 +58,16 @@ const Admin = () => {
   const [formData, setFormData] = useState(emptyProduct);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [frontMedia, setFrontMedia] = useState([]);
+  const [mobileFrontMedia, setMobileFrontMedia] = useState([]);
   const [selectedFrontFiles, setSelectedFrontFiles] = useState([]);
+  const [selectedMobileFrontFiles, setSelectedMobileFrontFiles] = useState([]);
+  const [categoryForm, setCategoryForm] = useState(emptyCategory);
+  const [editingCategoryId, setEditingCategoryId] = useState('');
+  const [selectedCategoryFile, setSelectedCategoryFile] = useState(null);
   const [savingProduct, setSavingProduct] = useState(false);
   const [savingFrontImages, setSavingFrontImages] = useState(false);
+  const [savingMobileFrontImages, setSavingMobileFrontImages] = useState(false);
+  const [savingCategory, setSavingCategory] = useState(false);
   const [completingOrder, setCompletingOrder] = useState('');
 
   useEffect(() => {
@@ -49,15 +75,17 @@ const Admin = () => {
       if (!isAdmin) return;
 
       try {
-        const [nextOrders, nextCustomers, nextFrontMedia] = await Promise.all([
+        const [nextOrders, nextCustomers, nextFrontMedia, nextMobileFrontMedia] = await Promise.all([
           listOrders(),
           listCustomers(),
           getFrontMedia(),
+          getFrontMedia('mobile'),
         ]);
 
         setOrders(nextOrders);
         setCustomers(nextCustomers);
         setFrontMedia(nextFrontMedia);
+        setMobileFrontMedia(nextMobileFrontMedia);
         setDashboardError('');
         setDashboardMessage('');
       } catch (err) {
@@ -68,6 +96,17 @@ const Admin = () => {
     fetchDashboardData();
   }, [isAdmin]);
 
+  useEffect(() => {
+    if (editingId || categories.length === 0 || categories.some(category => category.id === formData.categoryId)) {
+      return;
+    }
+
+    setFormData(currentFormData => ({
+      ...currentFormData,
+      categoryId: categories[0].id,
+    }));
+  }, [categories, editingId, formData.categoryId]);
+
   if (authLoading || loading) return <div style={{ padding: '80px 50px' }}>Loading...</div>;
 
   if (!isAdmin) {
@@ -76,7 +115,7 @@ const Admin = () => {
 
   const resetForm = () => {
     setEditingId(null);
-    setFormData(emptyProduct);
+    setFormData({ ...emptyProduct, categoryId: categories[0]?.id || emptyProduct.categoryId });
     setSelectedFiles([]);
   };
 
@@ -138,6 +177,10 @@ const Admin = () => {
     setSelectedFrontFiles(Array.from(event.target.files || []));
   };
 
+  const handleMobileFrontImageFiles = (event) => {
+    setSelectedMobileFrontFiles(Array.from(event.target.files || []));
+  };
+
   const handleSaveFrontImages = async (event) => {
     event.preventDefault();
     setSavingFrontImages(true);
@@ -157,6 +200,25 @@ const Admin = () => {
     }
   };
 
+  const handleSaveMobileFrontImages = async (event) => {
+    event.preventDefault();
+    setSavingMobileFrontImages(true);
+    setDashboardError('');
+    setDashboardMessage('');
+
+    try {
+      const uploadedUrls = await uploadFrontMedia({ files: selectedMobileFrontFiles, variant: 'mobile' });
+      const nextMedia = await saveFrontMedia([...mobileFrontMedia, ...uploadedUrls], 'mobile');
+      setMobileFrontMedia(nextMedia);
+      setSelectedMobileFrontFiles([]);
+      setDashboardMessage('Mobile front image updated. It will show below 879px screen width.');
+    } catch (err) {
+      setDashboardError(err.message);
+    } finally {
+      setSavingMobileFrontImages(false);
+    }
+  };
+
   const handleRemoveFrontImage = async (imageUrl) => {
     setSavingFrontImages(true);
     setDashboardError('');
@@ -170,6 +232,93 @@ const Admin = () => {
       setDashboardError(err.message);
     } finally {
       setSavingFrontImages(false);
+    }
+  };
+
+  const handleRemoveMobileFrontImage = async (imageUrl) => {
+    setSavingMobileFrontImages(true);
+    setDashboardError('');
+    setDashboardMessage('');
+
+    try {
+      const nextMedia = await saveFrontMedia(mobileFrontMedia.filter(url => url !== imageUrl), 'mobile');
+      setMobileFrontMedia(nextMedia);
+      setDashboardMessage('Mobile front image removed from the homepage.');
+    } catch (err) {
+      setDashboardError(err.message);
+    } finally {
+      setSavingMobileFrontImages(false);
+    }
+  };
+
+  const handleCategoryFile = (event) => {
+    setSelectedCategoryFile(event.target.files?.[0] || null);
+  };
+
+  const resetCategoryForm = () => {
+    setCategoryForm(emptyCategory);
+    setEditingCategoryId('');
+    setSelectedCategoryFile(null);
+  };
+
+  const handleEditCategory = (category) => {
+    setEditingCategoryId(category.id);
+    setSelectedCategoryFile(null);
+    setCategoryForm({
+      id: category.id,
+      name: category.name,
+      imageUrl: category.imageUrl || '',
+      sortOrder: category.sortOrder || 0,
+    });
+  };
+
+  const handleSaveCategory = async (event) => {
+    event.preventDefault();
+    setSavingCategory(true);
+    setDashboardError('');
+    setDashboardMessage('');
+
+    try {
+      const categoryId = editingCategoryId || categoryForm.id || createCategoryId(categoryForm.name);
+      const uploadedImage = selectedCategoryFile
+        ? await uploadCategoryImage({ file: selectedCategoryFile, categoryId })
+        : '';
+      const payload = {
+        ...categoryForm,
+        id: categoryId,
+        imageUrl: uploadedImage || categoryForm.imageUrl,
+      };
+
+      if (editingCategoryId) {
+        await updateCategory(editingCategoryId, payload);
+      } else {
+        await addCategory(payload);
+      }
+
+      resetCategoryForm();
+      setDashboardMessage('Category saved. Item counts update from the live product list.');
+    } catch (err) {
+      setDashboardError(err.message);
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async (category) => {
+    if (category.itemCount > 0) {
+      setDashboardError('Move or delete products in this category before deleting the category.');
+      return;
+    }
+
+    if (!window.confirm(`Delete category "${category.name}"?`)) {
+      return;
+    }
+
+    try {
+      await deleteCategory(category.id);
+      setDashboardMessage('Category deleted.');
+    } catch (err) {
+      setDashboardError(err.message);
     }
   };
 
@@ -317,6 +466,51 @@ const Admin = () => {
         </form>
       </section>
 
+      <section className="admin-orders admin-front-images">
+        <div className="admin-section-heading">
+          <div>
+            <p className="section-eyebrow">Mobile Homepage</p>
+            <h3>Front Image Under 879px</h3>
+          </div>
+          <span>{mobileFrontMedia.length} Live</span>
+        </div>
+
+        <form className="admin-front-form" onSubmit={handleSaveMobileFrontImages}>
+          <label className="admin-upload-field">
+            <span>Upload Mobile Front Image</span>
+            <input type="file" accept="image/*" multiple onChange={handleMobileFrontImageFiles} />
+          </label>
+
+          {(mobileFrontMedia.length > 0 || selectedMobileFrontFiles.length > 0) && (
+            <div className="admin-front-preview-grid">
+              {mobileFrontMedia.map(mediaUrl => (
+                <div className="admin-image-preview admin-front-preview" key={mediaUrl}>
+                  {renderFrontMediaPreview(mediaUrl, 'Mobile homepage front image')}
+                  <button type="button" onClick={() => handleRemoveMobileFrontImage(mediaUrl)} disabled={savingMobileFrontImages}>
+                    Remove
+                  </button>
+                </div>
+              ))}
+              {selectedMobileFrontFiles.map(file => {
+                const previewUrl = URL.createObjectURL(file);
+
+                return (
+                  <div className="admin-image-preview admin-front-preview" key={`${file.name}-${file.lastModified}`}>
+                    {renderFrontMediaPreview(previewUrl, file.name, file.type)}
+                    <span>New</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <button type="submit" className="btn-dark" disabled={savingMobileFrontImages || selectedMobileFrontFiles.length === 0}>
+            <ImagePlus size={16} />
+            {savingMobileFrontImages ? 'Saving...' : 'Save Mobile Front Image'}
+          </button>
+        </form>
+      </section>
+
       <section className="admin-orders">
         <div className="admin-section-heading">
           <div>
@@ -365,6 +559,102 @@ const Admin = () => {
         )}
       </section>
 
+      <section className="admin-orders">
+        <div className="admin-section-heading">
+          <div>
+            <p className="section-eyebrow">Catalog Setup</p>
+            <h3>Categories</h3>
+          </div>
+          <span>{categories.length} Total</span>
+        </div>
+
+        <div className="admin-category-layout">
+          <div className="admin-category-list">
+            {categories.map(category => (
+              <article className="admin-category-card" key={category.id}>
+                <div className="admin-category-thumb">
+                  {category.imageUrl ? <img src={category.imageUrl} alt={category.name} /> : <span>{category.name.slice(0, 1)}</span>}
+                </div>
+                <div>
+                  <strong>{category.name}</strong>
+                  <span>{category.id}</span>
+                  <p>{category.itemCount || 0} {(category.itemCount || 0) === 1 ? 'item' : 'items'}</p>
+                </div>
+                <div className="admin-actions">
+                  <button type="button" onClick={() => handleEditCategory(category)}><Edit2 size={16} /></button>
+                  <button type="button" onClick={() => handleDeleteCategory(category)} disabled={category.itemCount > 0}><Trash2 size={16} /></button>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <form className="admin-category-form" onSubmit={handleSaveCategory}>
+            <h4>{editingCategoryId ? 'Edit Category' : 'Add Category'}</h4>
+            <label className="admin-field">
+              <span>Category Name</span>
+              <input
+                required
+                type="text"
+                placeholder="Example: Sunglasses"
+                value={categoryForm.name}
+                onChange={event => setCategoryForm({
+                  ...categoryForm,
+                  name: event.target.value,
+                  id: editingCategoryId ? categoryForm.id : createCategoryId(event.target.value),
+                })}
+              />
+            </label>
+            <label className="admin-field">
+              <span>Category ID</span>
+              <input
+                required
+                type="text"
+                placeholder="auto-generated"
+                value={categoryForm.id}
+                disabled={Boolean(editingCategoryId)}
+                onChange={event => setCategoryForm({ ...categoryForm, id: createCategoryId(event.target.value) })}
+              />
+            </label>
+            <label className="admin-field">
+              <span>Sort Order</span>
+              <input
+                type="number"
+                value={categoryForm.sortOrder}
+                onChange={event => setCategoryForm({ ...categoryForm, sortOrder: Number(event.target.value) })}
+              />
+            </label>
+            <label className="admin-field">
+              <span>Category Image URL</span>
+              <input
+                type="url"
+                placeholder="Paste category image URL"
+                value={categoryForm.imageUrl}
+                onChange={event => setCategoryForm({ ...categoryForm, imageUrl: event.target.value })}
+              />
+            </label>
+            <label className="admin-upload-field">
+              <span>Upload Category Picture</span>
+              <input type="file" accept="image/*" onChange={handleCategoryFile} />
+            </label>
+            {(categoryForm.imageUrl || selectedCategoryFile) && (
+              <div className="admin-image-preview-grid">
+                <div className="admin-image-preview">
+                  <img src={selectedCategoryFile ? URL.createObjectURL(selectedCategoryFile) : categoryForm.imageUrl} alt="Category preview" />
+                  <span>{selectedCategoryFile ? 'New' : 'Current'}</span>
+                </div>
+              </div>
+            )}
+            <button type="submit" className="btn-dark" disabled={savingCategory}>
+              {editingCategoryId ? <Edit2 size={16} /> : <PlusCircle size={16} />}
+              {savingCategory ? 'Saving...' : editingCategoryId ? 'Update Category' : 'Add Category'}
+            </button>
+            {editingCategoryId && (
+              <button type="button" className="btn-primary" onClick={resetCategoryForm}>Cancel</button>
+            )}
+          </form>
+        </div>
+      </section>
+
       <div className="admin-products-grid">
         <div>
           <h3>Manage Products</h3>
@@ -379,7 +669,10 @@ const Admin = () => {
               </tr>
             </thead>
             <tbody>
-              {products.map(product => (
+              {products.map(product => {
+                const productCategory = categories.find(category => category.id === product.categoryId);
+
+                return (
                 <tr key={product.id}>
                   <td>
                     <div className="admin-product-thumb">
@@ -387,7 +680,7 @@ const Admin = () => {
                     </div>
                   </td>
                   <td>{product.name}</td>
-                  <td style={{ textTransform: 'capitalize' }}>{product.categoryId}</td>
+                  <td style={{ textTransform: 'capitalize' }}>{productCategory?.name || product.categoryId}</td>
                   <td>&#8377;{product.price}</td>
                   <td>
                     <div className="admin-actions">
@@ -396,7 +689,8 @@ const Admin = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -415,10 +709,9 @@ const Admin = () => {
             <label className="admin-field">
               <span>Category</span>
               <select value={formData.categoryId} onChange={event => setFormData({ ...formData, categoryId: event.target.value })}>
-                <option value="necklaces">Necklaces</option>
-                <option value="rings">Rings</option>
-                <option value="bracelets">Bracelets</option>
-                <option value="earrings">Earrings</option>
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
               </select>
             </label>
             <label className="admin-field">

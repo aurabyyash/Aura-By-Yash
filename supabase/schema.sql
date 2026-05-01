@@ -93,6 +93,15 @@ create table if not exists public.products (
 alter table public.products
 add column if not exists image_urls text[] not null default array[]::text[];
 
+create table if not exists public.categories (
+  id text primary key,
+  name text not null,
+  image_url text,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   order_number text not null unique,
@@ -143,6 +152,7 @@ create table if not exists public.site_assets (
 
 alter table public.profiles enable row level security;
 alter table public.products enable row level security;
+alter table public.categories enable row level security;
 alter table public.orders enable row level security;
 alter table public.site_assets enable row level security;
 
@@ -181,6 +191,31 @@ with check (public.is_admin());
 drop policy if exists "products_admin_delete" on public.products;
 create policy "products_admin_delete"
 on public.products for delete
+to authenticated
+using (public.is_admin());
+
+drop policy if exists "categories_public_read" on public.categories;
+create policy "categories_public_read"
+on public.categories for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "categories_admin_insert" on public.categories;
+create policy "categories_admin_insert"
+on public.categories for insert
+to authenticated
+with check (public.is_admin());
+
+drop policy if exists "categories_admin_update" on public.categories;
+create policy "categories_admin_update"
+on public.categories for update
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "categories_admin_delete" on public.categories;
+create policy "categories_admin_delete"
+on public.categories for delete
 to authenticated
 using (public.is_admin());
 
@@ -282,6 +317,21 @@ on conflict (id) do update set
   image_urls = excluded.image_urls,
   updated_at = now();
 
+insert into public.categories (id, name, sort_order)
+values
+  ('necklaces', 'Necklaces', 10),
+  ('rings', 'Rings', 20),
+  ('bracelets', 'Bracelets', 30),
+  ('earrings', 'Earrings', 40)
+on conflict (id) do update set
+  name = excluded.name,
+  sort_order = excluded.sort_order,
+  updated_at = now();
+
 insert into public.site_assets (key, image_urls)
 values ('front-image', array[]::text[])
+on conflict (key) do nothing;
+
+insert into public.site_assets (key, image_urls)
+values ('front-mobile-image', array[]::text[])
 on conflict (key) do nothing;

@@ -12,7 +12,7 @@ const initialSignup = {
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, loginWithProvider, signup, resendConfirmation } = useAuth();
+  const { login, signup, resendConfirmation } = useAuth();
   const [mode, setMode] = useState('signin');
   const [showPassword, setShowPassword] = useState(false);
   const [signinData, setSigninData] = useState({ email: '', password: '' });
@@ -75,18 +75,6 @@ const Login = () => {
     }
   };
 
-  const handleProviderLogin = (provider) => {
-    setError('');
-    setStatus(`Redirecting to ${provider === 'google' ? 'Google' : 'Apple'}...`);
-
-    try {
-      loginWithProvider(provider);
-    } catch (err) {
-      setError(err.message);
-      setStatus('');
-    }
-  };
-
   return (
     <main className="auth-ride-page">
       <header className="auth-ride-header">
@@ -95,6 +83,10 @@ const Login = () => {
 
       <section className="auth-ride-shell">
         <div className="auth-ride-card">
+          <Link to="/" className="auth-ride-logo-wrap" aria-label="Aura By Yash home">
+            <img src="/aura.png" alt="Aura By Yash" />
+          </Link>
+
           <div className="auth-ride-mode">
             <button type="button" className={mode === 'signin' ? 'active' : ''} onClick={() => setMode('signin')}>Login</button>
             <button type="button" className={mode === 'signup' ? 'active' : ''} onClick={() => setMode('signup')}>Sign up</button>
@@ -192,17 +184,6 @@ const Login = () => {
               </button>
             </form>
           )}
-
-          <div className="auth-ride-divider"><span>or</span></div>
-
-          <button className="auth-social-btn" type="button" onClick={() => handleProviderLogin('google')}>
-            <span className="auth-google-mark">G</span>
-            Continue with Google
-          </button>
-          <button className="auth-social-btn" type="button" onClick={() => handleProviderLogin('apple')}>
-            <span className="auth-apple-mark">A</span>
-            Continue with Apple
-          </button>
 
           {mode === 'signin' && (
             <button className="auth-ride-link" type="button" onClick={handleResend}>

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { categories } from '../data/products';
 import { useProducts } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 import ProductArt from '../components/ProductArt';
@@ -9,7 +8,7 @@ const Category = () => {
   const { categoryId } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
-  const { products, loading } = useProducts();
+  const { products, categories, loading } = useProducts();
   const [categoryProducts, setCategoryProducts] = useState([]);
   const [categoryName, setCategoryName] = useState('');
 
@@ -19,11 +18,11 @@ const Category = () => {
       setCategoryProducts(filtered);
       
       const cat = categories.find(c => c.id === categoryId);
-      setCategoryName(cat ? cat.name : 'Category');
+      setCategoryName(cat ? cat.name : categoryId);
     }
     
     window.scrollTo(0, 0);
-  }, [categoryId, products, loading]);
+  }, [categoryId, products, categories, loading]);
 
   if (loading) return <div className="page-loading">Loading...</div>;
 

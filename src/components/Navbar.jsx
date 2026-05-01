@@ -2,10 +2,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { LogOut, Search, ShoppingCart, User } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useProducts } from '../context/ProductContext';
 
 const Navbar = () => {
   const { cartCount } = useCart();
   const { isAuthenticated, isAdmin, logout, user } = useAuth();
+  const { categories } = useProducts();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -21,10 +23,9 @@ const Navbar = () => {
         </Link>
       </div>
       <ul className="nav-links">
-        <li><Link to="/category/necklaces">Necklaces</Link></li>
-        <li><Link to="/category/rings">Rings</Link></li>
-        <li><Link to="/category/bracelets">Bracelets</Link></li>
-        <li><Link to="/category/earrings">Earrings</Link></li>
+        {categories.slice(0, 5).map(category => (
+          <li key={category.id}><Link to={`/category/${category.id}`}>{category.name}</Link></li>
+        ))}
         {isAdmin && <li><Link to="/admin">Admin Panel</Link></li>}
       </ul>
       <div className="nav-icons">

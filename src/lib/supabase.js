@@ -13,6 +13,7 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 const SESSION_KEY = 'aura-supabase-session';
 const STORAGE_BUCKET = 'product-images';
 const FRONT_IMAGE_KEY = 'front-image';
+const FRONT_MOBILE_IMAGE_KEY = 'front-mobile-image';
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
 
@@ -68,6 +69,10 @@ const friendlySupabaseError = (message) => {
 
   if (message.includes("Could not find the table 'public.site_assets'")) {
     return 'Supabase setup is incomplete: run the latest schema migration so homepage front media can be saved.';
+  }
+
+  if (message.includes("Could not find the table 'public.categories'")) {
+    return 'Supabase setup is incomplete: run the latest schema migration so categories can be saved.';
   }
 
   if (message.includes("'image_urls'") && message.includes('schema cache')) {
@@ -318,6 +323,7 @@ export const restRequest = async (path, options = {}, session = getStoredSession
 };
 
 const encodeStoragePath = (path) => path.split('/').map(encodeURIComponent).join('/');
+const getFrontMediaKey = (variant = 'desktop') => (variant === 'mobile' ? FRONT_MOBILE_IMAGE_KEY : FRONT_IMAGE_KEY);
 
 export const publicStorageUrl = (path) => {
   requireConfig();
@@ -374,8 +380,18 @@ export const uploadProductImages = async ({ files, productId }, session = getSto
   return Promise.all(fileList.map((file, index) => uploadProductImage({ file, productId, index }, session)));
 };
 
-export const getFrontMedia = async () => {
-  const rows = await restRequest(`/site_assets?key=eq.${encodeURIComponent(FRONT_IMAGE_KEY)}&select=image_urls`, {
+export const uploadCategoryImage = async ({ file, categoryId }, session = getStoredSession()) => (
+  uploadStorageMedia({
+    file,
+    folder: `categories/${categoryId}`,
+    index: 0,
+    failureMessage: 'Category image upload failed.',
+  }, session)
+);
+
+export const getFrontMedia = async (variant = 'desktop') => {
+  const key = getFrontMediaKey(variant);
+  const rows = await restRequest(`/site_assets?key=eq.${encodeURIComponent(key)}&select=image_urls`, {
     cache: 'no-store',
     headers: { Prefer: '' },
   });
@@ -383,12 +399,13 @@ export const getFrontMedia = async () => {
   return Array.isArray(rows?.[0]?.image_urls) ? rows[0].image_urls : [];
 };
 
-export const saveFrontMedia = async (mediaUrls) => {
+export const saveFrontMedia = async (mediaUrls, variant = 'desktop') => {
+  const key = getFrontMediaKey(variant);
   const rows = await restRequest('/site_assets?on_conflict=key', {
     method: 'POST',
     prefer: 'resolution=merge-duplicates,return=representation',
     body: {
-      key: FRONT_IMAGE_KEY,
+      key,
       image_urls: Array.from(new Set((mediaUrls || []).filter(Boolean))),
     },
   });
@@ -396,16 +413,18 @@ export const saveFrontMedia = async (mediaUrls) => {
   return Array.isArray(rows?.[0]?.image_urls) ? rows[0].image_urls : [];
 };
 
-export const uploadFrontMedia = async ({ files }, session = getStoredSession()) => {
+export const uploadFrontMedia = async ({ files, variant = 'desktop' }, session = getStoredSession()) => {
   const fileList = Array.from(files || []);
 
   if (fileList.length === 0) {
     return [];
   }
 
+  const key = getFrontMediaKey(variant);
+
   return Promise.all(fileList.map((file, index) => uploadStorageMedia({
     file,
-    folder: FRONT_IMAGE_KEY,
+    folder: key,
     index,
     failureMessage: 'Front media upload failed.',
   }, session)));

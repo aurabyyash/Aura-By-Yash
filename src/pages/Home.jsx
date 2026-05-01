@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bookmark, MapPin, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
-import { categories } from '../data/products';
 import { useProducts } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -15,13 +14,18 @@ const Home = () => {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
   const { isAdmin, isAuthenticated } = useAuth();
-  const { products } = useProducts();
+  const { products, categories } = useProducts();
   const observerRef = useRef(null);
-  const [frontMedia, setFrontMedia] = useState([]);
+  const [desktopFrontMedia, setDesktopFrontMedia] = useState([]);
+  const [mobileFrontMedia, setMobileFrontMedia] = useState([]);
   const [frontMediaIndex, setFrontMediaIndex] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [useMobileFrontMedia, setUseMobileFrontMedia] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth < 879 : false
+  ));
 
   const latestDrops = products.filter(p => p.isNew || p.isHot || p.isLtd).slice(0, 6);
+  const frontMedia = useMobileFrontMedia && mobileFrontMedia.length > 0 ? mobileFrontMedia : desktopFrontMedia;
   const activeFrontMediaIndex = frontMedia.length > 0 ? frontMediaIndex % frontMedia.length : 0;
   const activeFrontMedia = frontMedia[activeFrontMediaIndex];
   const activeFrontMediaIsVideo = isVideoMedia(activeFrontMedia);
@@ -43,8 +47,14 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    getFrontMedia()
-      .then(setFrontMedia)
+    Promise.all([
+      getFrontMedia(),
+      getFrontMedia('mobile'),
+    ])
+      .then(([desktopMedia, mobileMedia]) => {
+        setDesktopFrontMedia(desktopMedia);
+        setMobileFrontMedia(mobileMedia);
+      })
       .catch((err) => console.error('Error loading front media:', err));
   }, []);
 
@@ -57,6 +67,21 @@ const Home = () => {
 
     return () => window.clearInterval(rotation);
   }, [frontMedia.length]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setUseMobileFrontMedia(window.innerWidth < 879);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    setFrontMediaIndex(0);
+  }, [useMobileFrontMedia, desktopFrontMedia.length, mobileFrontMedia.length]);
 
   const goTo = (path) => {
     setMenuOpen(false);
@@ -145,10 +170,11 @@ const Home = () => {
             <nav className="front-menu-panel" aria-label="Homepage menu">
               <button type="button" onClick={() => goTo('/all-products')}>Shop All</button>
               <button type="button" onClick={scrollToCategories}>Collections</button>
-              <button type="button" onClick={() => goTo('/category/necklaces')}>Necklaces</button>
-              <button type="button" onClick={() => goTo('/category/rings')}>Rings</button>
-              <button type="button" onClick={() => goTo('/category/bracelets')}>Bracelets</button>
-              <button type="button" onClick={() => goTo('/category/earrings')}>Earrings</button>
+              {categories.map(category => (
+                <button key={category.id} type="button" onClick={() => goTo(`/category/${category.id}`)}>
+                  {category.name} ({category.itemCount || 0})
+                </button>
+              ))}
               <button type="button" onClick={() => goTo('/cart')}>Cart ({cartCount})</button>
               {isAdmin && <button type="button" onClick={() => goTo('/admin')}>Admin Panel</button>}
               {!isAuthenticated && <button type="button" onClick={() => goTo('/login')}>Login</button>}
@@ -223,12 +249,16 @@ const Home = () => {
         <h2 className="section-title">Shop the <em>Collection</em></h2>
         <div className="cat-grid">
           {categories.map((cat) => (
-            <div key={cat.id} className="cat-card" onClick={() => navigate(`/category/${cat.id}`)}>
-              <div className="cat-icon-wrap">
-                <svg width="70" height="70" viewBox="0 0 70 70" fill="none">
-                  <circle cx="35" cy="35" r="24" strokeWidth="1.5" />
-                </svg>
-              </div>
+            <div key={cat.id} className={`cat-card${cat.imageUrl ? ' has-image' : ''}`} onClick={() => navigate(`/category/${cat.id}`)}>
+              {cat.imageUrl ? (
+                <img className="cat-image" src={cat.imageUrl} alt={cat.name} />
+              ) : (
+                <div className="cat-icon-wrap">
+                  <svg width="70" height="70" viewBox="0 0 70 70" fill="none">
+                    <circle cx="35" cy="35" r="24" strokeWidth="1.5" />
+                  </svg>
+                </div>
+              )}
               <div className="cat-inner">
                 <p className="cat-name">{cat.name}</p>
                 <p className="cat-count">{cat.count}</p>

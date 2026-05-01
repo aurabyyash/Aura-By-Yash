@@ -480,6 +480,9 @@ nav {
 .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 .cat-card { position: relative; overflow: hidden; cursor: pointer; aspect-ratio: 3/4; display: flex; align-items: flex-end; transition: transform 0.3s; background: var(--black); border: 1px solid var(--black); }
 .cat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+.cat-card.has-image { background: var(--black); }
+.cat-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.9; transition: transform 0.45s ease, opacity 0.45s ease; }
+.cat-card:hover .cat-image { transform: scale(1.04); opacity: 1; }
 .cat-icon-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .cat-icon-wrap svg { stroke: var(--white) !important; }
 .cat-icon-wrap svg circle, .cat-icon-wrap svg path, .cat-icon-wrap svg polygon, .cat-icon-wrap svg line { stroke: var(--white) !important; }
@@ -735,6 +738,89 @@ footer { background: var(--white); color: var(--black); padding: 50px 50px 24px;
 .admin-customer:last-child {
   border-bottom: none;
 }
+.admin-category-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 24px;
+  margin-top: 22px;
+}
+.admin-category-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.admin-category-card {
+  border: 1px solid var(--black);
+  background: var(--white);
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+.admin-category-thumb {
+  width: 74px;
+  height: 74px;
+  border: 1px solid var(--black);
+  background: var(--black);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 34px;
+  line-height: 1;
+  overflow: hidden;
+  text-transform: uppercase;
+}
+.admin-category-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.admin-category-card strong,
+.admin-category-card span,
+.admin-category-card p {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.admin-category-card strong {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.admin-category-card span {
+  color: var(--gray-dark);
+  font-size: 10px;
+  margin-top: 6px;
+}
+.admin-category-card p {
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 9px;
+  text-transform: uppercase;
+}
+.admin-category-form {
+  background: var(--gray-light);
+  border: 1px solid var(--gray-mid);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: fit-content;
+  padding: 18px;
+}
+.admin-category-form h4 {
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+.admin-category-form .btn-dark,
+.admin-category-form .btn-primary {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
 .admin-products-grid {
   display: grid;
   grid-template-columns: 1fr 340px;
@@ -923,6 +1009,7 @@ footer { background: var(--white); color: var(--black); padding: 50px 50px 24px;
   .product-gallery { grid-template-columns: repeat(4, 1fr); }
   .cart-content { grid-template-columns: 1fr; }
   .admin-order-list { grid-template-columns: 1fr; }
+  .admin-category-layout { grid-template-columns: 1fr; }
   .admin-products-grid { grid-template-columns: 1fr; }
   .admin-customer { grid-template-columns: 1fr; }
 }
@@ -934,6 +1021,10 @@ footer { background: var(--white); color: var(--black); padding: 50px 50px 24px;
   .footer-grid { grid-template-columns: 1fr; }
   .cart-item { grid-template-columns: 80px 1fr; }
   .product-gallery { grid-template-columns: repeat(3, 1fr); }
+  .admin-category-list { grid-template-columns: 1fr; }
+  .admin-category-card { grid-template-columns: 64px minmax(0, 1fr); }
+  .admin-category-card .admin-actions { grid-column: 1 / -1; }
+  .admin-category-thumb { width: 64px; height: 64px; }
   .cart-item-remove { grid-column: 1 / -1; text-align: left; margin-top: 10px; }
   nav { flex-wrap: wrap; gap: 15px; }
   .nav-links { order: 3; width: 100%; justify-content: space-between; }
@@ -2357,6 +2448,19 @@ footer { background: var(--white); color: var(--black); padding: 50px 50px 24px;
   width: min(100%, 420px);
 }
 
+.auth-ride-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+  text-decoration: none;
+}
+
+.auth-ride-logo-wrap img {
+  width: min(184px, 62vw);
+  max-height: 84px;
+  object-fit: contain;
+}
+
 .auth-ride-mode {
   display: inline-flex;
   gap: 6px;
@@ -2450,8 +2554,7 @@ footer { background: var(--white); color: var(--black); padding: 50px 50px 24px;
   justify-content: center;
 }
 
-.auth-ride-submit,
-.auth-social-btn {
+.auth-ride-submit {
   width: 100%;
   min-height: 62px;
   border: none;
@@ -2470,51 +2573,6 @@ footer { background: var(--white); color: var(--black); padding: 50px 50px 24px;
   background: var(--black);
   color: var(--white);
   margin-top: 8px;
-}
-
-.auth-ride-divider {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 12px;
-  color: #555555;
-  font-size: 16px;
-  margin: 28px 0 18px;
-}
-
-.auth-ride-divider::before,
-.auth-ride-divider::after {
-  content: '';
-  height: 1px;
-  background: #8f8f8f;
-}
-
-.auth-social-btn {
-  background: #e8e8e8;
-  color: var(--black);
-  margin-top: 10px;
-}
-
-.auth-google-mark,
-.auth-apple-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-}
-
-.auth-google-mark {
-  background: var(--white);
-  color: #4285f4;
-}
-
-.auth-apple-mark {
-  background: var(--black);
-  color: var(--white);
-  font-size: 13px;
 }
 
 .auth-ride-link {
@@ -2556,13 +2614,8 @@ footer { background: var(--white); color: var(--black); padding: 50px 50px 24px;
   }
 
   .auth-ride-field,
-  .auth-ride-submit,
-  .auth-social-btn {
+  .auth-ride-submit {
     min-height: 56px;
-  }
-
-  .auth-social-btn {
-    font-size: 15px;
   }
 
   .auth-ride-legal {
@@ -2581,8 +2634,7 @@ footer { background: var(--white); color: var(--black); padding: 50px 50px 24px;
   }
 
   .auth-ride-field input,
-  .auth-ride-submit,
-  .auth-social-btn {
+  .auth-ride-submit {
     font-size: 14px;
   }
 }

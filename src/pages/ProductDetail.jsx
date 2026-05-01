@@ -8,7 +8,7 @@ const ProductDetail = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
-  const { products, loading } = useProducts();
+  const { products, categories, loading } = useProducts();
   const [product, setProduct] = useState(null);
   const [selectedImage, setSelectedImage] = useState('');
 
@@ -39,6 +39,7 @@ const ProductDetail = () => {
     : (product.imageUrl ? [product.imageUrl] : []);
   const visibleImages = productImages.length ? productImages : [''];
   const formatPrice = (value) => Number(value || 0).toLocaleString('en-IN');
+  const category = categories.find(currentCategory => currentCategory.id === product.categoryId);
 
   return (
     <div className="product-detail-container">
@@ -74,7 +75,7 @@ const ProductDetail = () => {
       <div className="product-detail-info">
         <p className="pd-category">
           <Link to={`/category/${product.categoryId}`} className="text-link" style={{ border: 'none' }}>
-            {product.categoryId}
+            {category?.name || product.categoryId}
           </Link>
         </p>
         <h1 className="pd-title">{product.name}</h1>
