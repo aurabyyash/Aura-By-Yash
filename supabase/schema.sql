@@ -135,9 +135,16 @@ create index if not exists orders_razorpay_order_id_idx on public.orders (razorp
 create index if not exists orders_razorpay_payment_id_idx on public.orders (razorpay_payment_id);
 create index if not exists orders_status_created_at_idx on public.orders (status, created_at desc);
 
+create table if not exists public.site_assets (
+  key text primary key,
+  image_urls text[] not null default array[]::text[],
+  updated_at timestamptz not null default now()
+);
+
 alter table public.profiles enable row level security;
 alter table public.products enable row level security;
 alter table public.orders enable row level security;
+alter table public.site_assets enable row level security;
 
 drop policy if exists "profiles_select_own_or_admin" on public.profiles;
 create policy "profiles_select_own_or_admin"
@@ -196,6 +203,31 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "site_assets_public_read" on public.site_assets;
+create policy "site_assets_public_read"
+on public.site_assets for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "site_assets_admin_insert" on public.site_assets;
+create policy "site_assets_admin_insert"
+on public.site_assets for insert
+to authenticated
+with check (public.is_admin());
+
+drop policy if exists "site_assets_admin_update" on public.site_assets;
+create policy "site_assets_admin_update"
+on public.site_assets for update
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "site_assets_admin_delete" on public.site_assets;
+create policy "site_assets_admin_delete"
+on public.site_assets for delete
+to authenticated
+using (public.is_admin());
+
 insert into storage.buckets (id, name, public)
 values ('product-images', 'product-images', true)
 on conflict (id) do update set public = excluded.public;
@@ -249,3 +281,7 @@ on conflict (id) do update set
   image_url = excluded.image_url,
   image_urls = excluded.image_urls,
   updated_at = now();
+
+insert into public.site_assets (key, image_urls)
+values ('front-image', array[]::text[])
+on conflict (key) do nothing;

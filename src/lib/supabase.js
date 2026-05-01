@@ -12,6 +12,7 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
   || DEFAULT_SUPABASE_PUBLISHABLE_KEY;
 const SESSION_KEY = 'aura-supabase-session';
 const STORAGE_BUCKET = 'product-images';
+const FRONT_IMAGE_KEY = 'front-image';
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
 
@@ -63,6 +64,10 @@ const friendlySupabaseError = (message) => {
 
   if (message.includes("Could not find the table 'public.profiles'")) {
     return 'Supabase setup is incomplete: run the schema migration so the profiles table exists.';
+  }
+
+  if (message.includes("Could not find the table 'public.site_assets'")) {
+    return 'Supabase setup is incomplete: run the latest schema migration so homepage front images can be saved.';
   }
 
   if (message.includes("'image_urls'") && message.includes('schema cache')) {
@@ -306,16 +311,16 @@ export const publicStorageUrl = (path) => {
   return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${encodeStoragePath(path)}`;
 };
 
-export const uploadProductImage = async ({ file, productId, index }, session = getStoredSession()) => {
+const uploadStorageImage = async ({ file, folder, index, failureMessage }, session = getStoredSession()) => {
   requireConfig();
 
   if (!session?.access_token) {
-    throw new Error('Sign in as admin before uploading product images.');
+    throw new Error('Sign in as admin before uploading images.');
   }
 
   const extension = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
   const safeName = `${Date.now()}-${index}.${extension}`.toLowerCase();
-  const path = `${productId}/${safeName}`;
+  const path = `${folder}/${safeName}`;
 
   const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${encodeStoragePath(path)}`, {
     method: 'POST',
@@ -331,11 +336,20 @@ export const uploadProductImage = async ({ file, productId, index }, session = g
   if (!response.ok) {
     const text = await response.text();
     const data = text ? JSON.parse(text) : null;
-    throw new Error(friendlySupabaseError(data?.message || 'Product image upload failed.'));
+    throw new Error(friendlySupabaseError(data?.message || failureMessage || 'Image upload failed.'));
   }
 
   return publicStorageUrl(path);
 };
+
+export const uploadProductImage = async ({ file, productId, index }, session = getStoredSession()) => (
+  uploadStorageImage({
+    file,
+    folder: productId,
+    index,
+    failureMessage: 'Product image upload failed.',
+  }, session)
+);
 
 export const uploadProductImages = async ({ files, productId }, session = getStoredSession()) => {
   const fileList = Array.from(files || []);
@@ -345,4 +359,40 @@ export const uploadProductImages = async ({ files, productId }, session = getSto
   }
 
   return Promise.all(fileList.map((file, index) => uploadProductImage({ file, productId, index }, session)));
+};
+
+export const getFrontImages = async () => {
+  const rows = await restRequest(`/site_assets?key=eq.${encodeURIComponent(FRONT_IMAGE_KEY)}&select=image_urls`, {
+    headers: { Prefer: '' },
+  });
+
+  return Array.isArray(rows?.[0]?.image_urls) ? rows[0].image_urls : [];
+};
+
+export const saveFrontImages = async (imageUrls) => {
+  const rows = await restRequest('/site_assets?on_conflict=key', {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates,return=representation',
+    body: {
+      key: FRONT_IMAGE_KEY,
+      image_urls: Array.from(new Set((imageUrls || []).filter(Boolean))),
+    },
+  });
+
+  return Array.isArray(rows?.[0]?.image_urls) ? rows[0].image_urls : [];
+};
+
+export const uploadFrontImages = async ({ files }, session = getStoredSession()) => {
+  const fileList = Array.from(files || []);
+
+  if (fileList.length === 0) {
+    return [];
+  }
+
+  return Promise.all(fileList.map((file, index) => uploadStorageImage({
+    file,
+    folder: FRONT_IMAGE_KEY,
+    index,
+    failureMessage: 'Front image upload failed.',
+  }, session)));
 };

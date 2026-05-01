@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { CheckCircle2, Edit2, PlusCircle, Trash2 } from 'lucide-react';
+import { CheckCircle2, Edit2, ImagePlus, PlusCircle, Trash2 } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
 import { useAuth } from '../context/AuthContext';
 import { completeOrder, listOrders } from '../utils/orders';
 import { listCustomers } from '../services/profiles';
 import ProductArt from '../components/ProductArt';
-import { uploadProductImages } from '../lib/supabase';
+import { getFrontImages, saveFrontImages, uploadFrontImages, uploadProductImages } from '../lib/supabase';
 
 const emptyProduct = {
   id: '',
@@ -36,7 +36,10 @@ const Admin = () => {
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState(emptyProduct);
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [frontImages, setFrontImages] = useState([]);
+  const [selectedFrontFiles, setSelectedFrontFiles] = useState([]);
   const [savingProduct, setSavingProduct] = useState(false);
+  const [savingFrontImages, setSavingFrontImages] = useState(false);
   const [completingOrder, setCompletingOrder] = useState('');
 
   useEffect(() => {
@@ -44,13 +47,15 @@ const Admin = () => {
       if (!isAdmin) return;
 
       try {
-        const [nextOrders, nextCustomers] = await Promise.all([
+        const [nextOrders, nextCustomers, nextFrontImages] = await Promise.all([
           listOrders(),
           listCustomers(),
+          getFrontImages(),
         ]);
 
         setOrders(nextOrders);
         setCustomers(nextCustomers);
+        setFrontImages(nextFrontImages);
         setDashboardError('');
         setDashboardMessage('');
       } catch (err) {
@@ -125,6 +130,45 @@ const Admin = () => {
 
   const handleImageFiles = (event) => {
     setSelectedFiles(Array.from(event.target.files || []));
+  };
+
+  const handleFrontImageFiles = (event) => {
+    setSelectedFrontFiles(Array.from(event.target.files || []));
+  };
+
+  const handleSaveFrontImages = async (event) => {
+    event.preventDefault();
+    setSavingFrontImages(true);
+    setDashboardError('');
+    setDashboardMessage('');
+
+    try {
+      const uploadedUrls = await uploadFrontImages({ files: selectedFrontFiles });
+      const nextImages = await saveFrontImages([...frontImages, ...uploadedUrls]);
+      setFrontImages(nextImages);
+      setSelectedFrontFiles([]);
+      setDashboardMessage('Front image updated. The homepage will use the latest uploaded image set.');
+    } catch (err) {
+      setDashboardError(err.message);
+    } finally {
+      setSavingFrontImages(false);
+    }
+  };
+
+  const handleRemoveFrontImage = async (imageUrl) => {
+    setSavingFrontImages(true);
+    setDashboardError('');
+    setDashboardMessage('');
+
+    try {
+      const nextImages = await saveFrontImages(frontImages.filter(url => url !== imageUrl));
+      setFrontImages(nextImages);
+      setDashboardMessage('Front image removed from the homepage.');
+    } catch (err) {
+      setDashboardError(err.message);
+    } finally {
+      setSavingFrontImages(false);
+    }
   };
 
   const removeExistingImage = (imageUrl) => {
@@ -218,6 +262,47 @@ const Admin = () => {
       {dashboardError && <p className="admin-alert">{dashboardError}</p>}
       {dashboardMessage && <p className="admin-success">{dashboardMessage}</p>}
 
+      <section className="admin-orders admin-front-images">
+        <div className="admin-section-heading">
+          <div>
+            <p className="section-eyebrow">Homepage</p>
+            <h3>Front Image</h3>
+          </div>
+          <span>{frontImages.length} Live</span>
+        </div>
+
+        <form className="admin-front-form" onSubmit={handleSaveFrontImages}>
+          <label className="admin-upload-field">
+            <span>Upload Front Image</span>
+            <input type="file" accept="image/*" multiple onChange={handleFrontImageFiles} />
+          </label>
+
+          {(frontImages.length > 0 || selectedFrontFiles.length > 0) && (
+            <div className="admin-front-preview-grid">
+              {frontImages.map(imageUrl => (
+                <div className="admin-image-preview admin-front-preview" key={imageUrl}>
+                  <img src={imageUrl} alt="Homepage front" />
+                  <button type="button" onClick={() => handleRemoveFrontImage(imageUrl)} disabled={savingFrontImages}>
+                    Remove
+                  </button>
+                </div>
+              ))}
+              {selectedFrontFiles.map(file => (
+                <div className="admin-image-preview admin-front-preview" key={`${file.name}-${file.lastModified}`}>
+                  <img src={URL.createObjectURL(file)} alt={file.name} />
+                  <span>New</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button type="submit" className="btn-dark" disabled={savingFrontImages || selectedFrontFiles.length === 0}>
+            <ImagePlus size={16} />
+            {savingFrontImages ? 'Saving...' : 'Save Front Image'}
+          </button>
+        </form>
+      </section>
+
       <section className="admin-orders">
         <div className="admin-section-heading">
           <div>
@@ -305,30 +390,54 @@ const Admin = () => {
         <div className="admin-product-form">
           <h3>{editingId ? 'Edit Product' : 'Add New Product'}</h3>
           <form onSubmit={handleSave}>
-            <input type="text" placeholder="Product ID" value={formData.id} onChange={event => setFormData({ ...formData, id: event.target.value })} />
-            <input required type="text" placeholder="Product Name" value={formData.name} onChange={event => setFormData({ ...formData, name: event.target.value })} />
-            <select value={formData.categoryId} onChange={event => setFormData({ ...formData, categoryId: event.target.value })}>
-              <option value="necklaces">Necklaces</option>
-              <option value="rings">Rings</option>
-              <option value="bracelets">Bracelets</option>
-              <option value="earrings">Earrings</option>
-            </select>
-            <input required type="number" placeholder="Price" value={formData.price} onChange={event => setFormData({ ...formData, price: Number(event.target.value) })} />
-            <input type="text" placeholder="Rating" value={formData.rating} onChange={event => setFormData({ ...formData, rating: event.target.value })} />
-            <input type="text" placeholder="Material" value={formData.material} onChange={event => setFormData({ ...formData, material: event.target.value })} />
-            <input type="text" placeholder="Anti-tarnish (Yes/No)" value={formData.antitarnish} onChange={event => setFormData({ ...formData, antitarnish: event.target.value })} />
-            <input
-              type="url"
-              placeholder="Product Image URL"
-              value={formData.imageUrl}
-              onChange={event => setFormData({
-                ...formData,
-                imageUrl: event.target.value,
-                imageUrls: event.target.value
-                  ? [event.target.value, ...formData.imageUrls.filter(url => url !== event.target.value)]
-                  : formData.imageUrls,
-              })}
-            />
+            <label className="admin-field">
+              <span>Product ID</span>
+              <input type="text" placeholder="Example: chain-01" value={formData.id} onChange={event => setFormData({ ...formData, id: event.target.value })} />
+            </label>
+            <label className="admin-field">
+              <span>Product Name</span>
+              <input required type="text" placeholder="Enter product name" value={formData.name} onChange={event => setFormData({ ...formData, name: event.target.value })} />
+            </label>
+            <label className="admin-field">
+              <span>Category</span>
+              <select value={formData.categoryId} onChange={event => setFormData({ ...formData, categoryId: event.target.value })}>
+                <option value="necklaces">Necklaces</option>
+                <option value="rings">Rings</option>
+                <option value="bracelets">Bracelets</option>
+                <option value="earrings">Earrings</option>
+              </select>
+            </label>
+            <label className="admin-field">
+              <span>Price</span>
+              <input required type="number" placeholder="Enter price" value={formData.price} onChange={event => setFormData({ ...formData, price: Number(event.target.value) })} />
+            </label>
+            <label className="admin-field">
+              <span>Rating</span>
+              <input type="text" placeholder="Example: 5.0 (12)" value={formData.rating} onChange={event => setFormData({ ...formData, rating: event.target.value })} />
+            </label>
+            <label className="admin-field">
+              <span>Material</span>
+              <input type="text" placeholder="Example: Stainless Steel" value={formData.material} onChange={event => setFormData({ ...formData, material: event.target.value })} />
+            </label>
+            <label className="admin-field">
+              <span>Anti-tarnish</span>
+              <input type="text" placeholder="Yes / No" value={formData.antitarnish} onChange={event => setFormData({ ...formData, antitarnish: event.target.value })} />
+            </label>
+            <label className="admin-field">
+              <span>Product Image URL</span>
+              <input
+                type="url"
+                placeholder="Paste image URL"
+                value={formData.imageUrl}
+                onChange={event => setFormData({
+                  ...formData,
+                  imageUrl: event.target.value,
+                  imageUrls: event.target.value
+                    ? [event.target.value, ...formData.imageUrls.filter(url => url !== event.target.value)]
+                    : formData.imageUrls,
+                })}
+              />
+            </label>
             <label className="admin-upload-field">
               <span>Upload Catalog Images</span>
               <input type="file" accept="image/*" multiple onChange={handleImageFiles} />
@@ -351,8 +460,12 @@ const Admin = () => {
               </div>
             )}
 
-            <textarea placeholder="Description" value={formData.description} onChange={event => setFormData({ ...formData, description: event.target.value })}></textarea>
+            <label className="admin-field">
+              <span>Description</span>
+              <textarea placeholder="Enter product description" value={formData.description} onChange={event => setFormData({ ...formData, description: event.target.value })}></textarea>
+            </label>
 
+            <p className="admin-field-label">Product Badges</p>
             <div className="admin-checks">
               <label><input type="checkbox" checked={formData.isNew} onChange={event => setFormData({ ...formData, isNew: event.target.checked })} /> New</label>
               <label><input type="checkbox" checked={formData.isHot} onChange={event => setFormData({ ...formData, isHot: event.target.checked })} /> Hot</label>

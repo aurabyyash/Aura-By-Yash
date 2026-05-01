@@ -1,19 +1,22 @@
-/* eslint-disable react/no-unescaped-entities */
-
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Bookmark, MapPin, Menu, Search, ShoppingCart, User } from 'lucide-react';
 import { categories } from '../data/products';
 import { useProducts } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 import ProductArt from '../components/ProductArt';
+import { getFrontImages } from '../lib/supabase';
 
 const Home = () => {
   const navigate = useNavigate();
-  const { addToCart } = useCart();
+  const { addToCart, cartCount } = useCart();
   const { products } = useProducts();
   const observerRef = useRef(null);
+  const [frontImages, setFrontImages] = useState([]);
+  const [frontImageIndex, setFrontImageIndex] = useState(0);
 
   const latestDrops = products.filter(p => p.isNew || p.isHot || p.isLtd).slice(0, 6);
+  const activeFrontImage = frontImages[frontImageIndex % Math.max(frontImages.length, 1)];
 
   useEffect(() => {
     observerRef.current = new IntersectionObserver((entries) => {
@@ -31,46 +34,87 @@ const Home = () => {
     };
   }, []);
 
+  useEffect(() => {
+    getFrontImages()
+      .then(setFrontImages)
+      .catch((err) => console.error('Error loading front images:', err));
+  }, []);
+
+  useEffect(() => {
+    if (frontImages.length < 2) return undefined;
+
+    const rotation = window.setInterval(() => {
+      setFrontImageIndex(currentIndex => (currentIndex + 1) % frontImages.length);
+    }, 5500);
+
+    return () => window.clearInterval(rotation);
+  }, [frontImages.length]);
+
   return (
     <>
-      <section className="hero">
-        <div className="hero-left">
-          <p className="hero-tag">Gen Z Men's Jewelry — 2025 Collection</p>
-          <h1 className="hero-title">Wear Your<br /><span>Aura.</span></h1>
-          <p className="hero-desc">Bold. Raw. Unapologetically yours. Jewelry crafted for the new generation of men who wear their energy.</p>
-          <div className="hero-btns">
-            <button className="btn-dark" onClick={() => navigate('/all-products')}>Shop Now</button>
-            <button className="btn-primary" onClick={() => document.getElementById('categories').scrollIntoView({ behavior: 'smooth' })}>Explore</button>
+      <section
+        className={`hero front-hero${activeFrontImage ? ' has-front-image' : ''}`}
+        style={activeFrontImage ? {
+          backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 30%, rgba(0,0,0,0.28) 100%), url("${activeFrontImage}")`,
+        } : undefined}
+      >
+        <div className="front-hero-nav">
+          <div className="front-hero-links" aria-label="Featured navigation">
+            <button type="button" onClick={() => navigate('/all-products')}>New in</button>
+            <button type="button" onClick={() => document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth' })}>Collections</button>
+          </div>
+
+          <Link className="front-hero-logo" to="/" aria-label="Aura By Yash home">
+            <img src="/aura.png" alt="Aura By Yash" />
+          </Link>
+
+          <div className="front-hero-icons">
+            <button type="button" aria-label="Collections"><Bookmark size={22} /></button>
+            <button type="button" aria-label="Store location"><MapPin size={22} /></button>
+            <button type="button" aria-label="Search"><Search size={22} /></button>
+            <button type="button" aria-label="Login" onClick={() => navigate('/login')}><User size={22} /></button>
+            <Link className="front-cart-link" to="/cart" aria-label="Cart">
+              <ShoppingCart size={22} />
+              {cartCount > 0 && <span className="front-cart-count">{cartCount}</span>}
+            </Link>
+            <button type="button" className="front-menu-btn" aria-label="Menu"><Menu size={26} /></button>
           </div>
         </div>
-        <div className="hero-right">
-          <div className="hero-card">
-            <div className="hero-badge"><span>NEW</span><span>DROP</span></div>
-            <svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="80" cy="80" r="60" fill="none" strokeWidth="1.5" />
-              <circle cx="80" cy="80" r="44" fill="none" strokeWidth="1" strokeDasharray="3,3" />
-              <polygon points="80,50 91,68 112,68 96,80 102,99 80,87 58,99 64,80 48,68 69,68" fill="none" strokeWidth="1.5" />
-            </svg>
-            <div className="hero-product-label">
-              <p>Celestial Chain</p>
-              <p>Statement Necklace</p>
-            </div>
-          </div>
+
+        <div className="front-hero-fallback" aria-hidden="true">
+          <span>Aura</span>
         </div>
+
+        <button className="front-hero-shop" type="button" onClick={() => navigate('/all-products')}>
+          Shop now
+        </button>
+
+        {frontImages.length > 1 && (
+          <div className="front-hero-dots" aria-label="Front image slides">
+            {frontImages.map((imageUrl, index) => (
+              <button
+                key={imageUrl}
+                type="button"
+                className={index === frontImageIndex ? 'active' : ''}
+                aria-label={`Show front image ${index + 1}`}
+                onClick={() => setFrontImageIndex(index)}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="marquee-wrap">
         <div className="marquee-track">
           {[...Array(10)].map((_, i) => (
             <React.Fragment key={i}>
-              <div className="marquee-item"><span>{i % 2 === 0 ? 'Free Shipping Above ₹999' : 'Premium Gen Z Jewelry'}</span><span className="marquee-dot"></span></div>
+              <div className="marquee-item"><span>{i % 2 === 0 ? 'Free Shipping Above Rs.999' : 'Premium Gen Z Jewelry'}</span><span className="marquee-dot"></span></div>
               <div className="marquee-item"><span>Aura By Yash</span><span className="marquee-dot"></span></div>
             </React.Fragment>
           ))}
         </div>
       </div>
 
-      {/* Latest Drops ABOVE Browse by Category */}
       <section className="section products reveal">
         <p className="section-eyebrow">Latest Drops</p>
         <h2 className="section-title">New <em>Arrivals</em></h2>
@@ -90,7 +134,7 @@ const Home = () => {
               <div className="prod-info">
                 <p className="prod-name">{product.name}</p>
                 <div className="prod-meta">
-                  <span className="prod-price">₹{product.price}</span>
+                  <span className="prod-price">Rs. {product.price}</span>
                   <span className="prod-rating">{product.rating}</span>
                 </div>
               </div>
@@ -122,7 +166,7 @@ const Home = () => {
       <div className="feature-strip reveal">
         <div className="feat-item"><svg className="feat-icon" viewBox="0 0 36 36" fill="none"><path d="M18 3L33 10V26L18 33L3 26V10Z" strokeWidth="1.5" fill="none" /></svg><p className="feat-title">Premium Quality</p><p className="feat-desc">High-grade metals & stones</p></div>
         <div className="feat-item"><svg className="feat-icon" viewBox="0 0 36 36" fill="none"><rect x="7" y="9" width="22" height="18" rx="2" strokeWidth="1.5" fill="none" /><path d="M13 18 L16 21 L23 14" strokeWidth="1.5" strokeLinecap="round" /></svg><p className="feat-title">Easy Returns</p><p className="feat-desc">7-day hassle-free returns</p></div>
-        <div className="feat-item"><svg className="feat-icon" viewBox="0 0 36 36" fill="none"><path d="M7 18L18 7L29 18" strokeWidth="1.5" strokeLinecap="round" /><path d="M11 14V29H25V14" strokeWidth="1.5" fill="none" /><rect x="15" y="22" width="6" height="7" strokeWidth="1" fill="none" /></svg><p className="feat-title">Free Shipping</p><p className="feat-desc">On orders above ₹999</p></div>
+        <div className="feat-item"><svg className="feat-icon" viewBox="0 0 36 36" fill="none"><path d="M7 18L18 7L29 18" strokeWidth="1.5" strokeLinecap="round" /><path d="M11 14V29H25V14" strokeWidth="1.5" fill="none" /><rect x="15" y="22" width="6" height="7" strokeWidth="1" fill="none" /></svg><p className="feat-title">Free Shipping</p><p className="feat-desc">On orders above Rs.999</p></div>
         <div className="feat-item"><svg className="feat-icon" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="16" r="7" strokeWidth="1.5" fill="none" /><path d="M12 27 Q18 23 24 27" strokeWidth="1.5" strokeLinecap="round" fill="none" /><path d="M26 12 L28 14 L32 10" strokeWidth="1" strokeLinecap="round" /></svg><p className="feat-title">Verified Brand</p><p className="feat-desc">100% authentic & hallmarked</p></div>
       </div>
 
@@ -137,7 +181,7 @@ const Home = () => {
         <div>
           <p className="section-eyebrow">Our Story</p>
           <h2 className="editorial-quote">Jewelry that <em>defines</em> your generation.</h2>
-          <p className="editorial-body">Aura by Yash was born from a simple idea — men deserve jewelry that speaks as loud as their personality. We design for the bold, the expressive, and the unapologetically themselves.</p>
+          <p className="editorial-body">Aura by Yash was born from a simple idea: men deserve jewelry that speaks as loud as their personality. We design for the bold, the expressive, and the unapologetically themselves.</p>
           <a href="#" className="text-link">Read Our Story</a>
         </div>
       </section>
@@ -163,7 +207,7 @@ const Home = () => {
           <div><p className="footer-col-title">Follow</p><ul className="footer-links"><li><a href="#">Instagram</a></li><li><a href="#">Pinterest</a></li><li><a href="#">YouTube</a></li><li><a href="#">WhatsApp</a></li></ul></div>
         </div>
         <div className="footer-bottom">
-          <p className="footer-copy">© 2025 Aura By Yash. All rights reserved.</p>
+          <p className="footer-copy">(c) 2025 Aura By Yash. All rights reserved.</p>
           <div className="footer-socials"><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Contact</a></div>
         </div>
       </footer>

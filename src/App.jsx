@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Category from './pages/Category';
@@ -12,25 +12,34 @@ import { CartProvider } from './context/CartContext';
 import { ProductProvider } from './context/ProductContext';
 import { AuthProvider } from './context/AuthContext';
 
+const AppShell = () => {
+  const location = useLocation();
+  const isHome = location.pathname === '/';
+
+  return (
+    <div className={`app-container${isHome ? ' is-home' : ''}`}>
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/all-products" element={<AllProducts />} />
+        <Route path="/category/:categoryId" element={<Category />} />
+        <Route path="/product/:productId" element={<ProductDetail />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/confirmed-orders" element={<ConfirmedOrders />} />
+      </Routes>
+    </div>
+  );
+};
+
 function App() {
   return (
     <AuthProvider>
       <ProductProvider>
         <CartProvider>
           <Router>
-            <div className="app-container">
-              <Navbar />
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/all-products" element={<AllProducts />} />
-                <Route path="/category/:categoryId" element={<Category />} />
-                <Route path="/product/:productId" element={<ProductDetail />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="/admin" element={<Admin />} />
-                <Route path="/admin/confirmed-orders" element={<ConfirmedOrders />} />
-              </Routes>
-            </div>
+            <AppShell />
           </Router>
         </CartProvider>
       </ProductProvider>
