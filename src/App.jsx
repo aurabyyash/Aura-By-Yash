@@ -6,6 +6,7 @@ import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import AllProducts from './pages/AllProducts';
 import Admin from './pages/Admin';
+import ConfirmedOrders from './pages/ConfirmedOrders';
 import Login from './pages/Login';
 import { CartProvider } from './context/CartContext';
 import { ProductProvider } from './context/ProductContext';
@@ -27,6 +28,7 @@ function App() {
                 <Route path="/product/:productId" element={<ProductDetail />} />
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/admin" element={<Admin />} />
+                <Route path="/admin/confirmed-orders" element={<ConfirmedOrders />} />
               </Routes>
             </div>
           </Router>

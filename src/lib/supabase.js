@@ -268,6 +268,28 @@ export const sendOrderCompletionMail = async (order, session = getStoredSession(
   }, session)
 );
 
+export const appendConfirmedOrdersToSheet = async (orders, session = getStoredSession()) => (
+  callSupabaseFunction('order-sheet-sync', {
+    orders: orders.map(order => ({
+      orderNumber: order.orderNumber,
+      status: order.status,
+      date: order.date,
+      completedAt: order.completedAt,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      customerPhone: order.customerPhone,
+      items: order.items,
+      subtotal: order.subtotal,
+      shipping: order.shipping,
+      total: order.total,
+      paymentProvider: order.paymentProvider,
+      paymentStatus: order.paymentStatus,
+      razorpayOrderId: order.razorpayOrderId,
+      razorpayPaymentId: order.razorpayPaymentId,
+    })),
+  }, session)
+);
+
 export const restRequest = async (path, options = {}, session = getStoredSession()) => {
   const headers = {
     Prefer: options.prefer || 'return=representation',

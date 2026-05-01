@@ -1538,6 +1538,95 @@ footer { background: var(--white); color: var(--black); padding: 50px 50px 24px;
   opacity: 0.55;
 }
 
+.admin-heading-actions,
+.confirmed-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-link-button {
+  border: 1px solid var(--black);
+  background: var(--white);
+  color: var(--black);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  line-height: 1.4;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: background 0.25s, color 0.25s;
+}
+
+.admin-link-button:hover {
+  background: var(--black);
+  color: var(--white);
+}
+
+.confirmed-page {
+  padding: 50px;
+  min-height: 80vh;
+}
+
+.confirmed-toolbar {
+  border-bottom: 1px solid var(--black);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+}
+
+.confirmed-toolbar .section-title {
+  margin-bottom: 0;
+}
+
+.confirmed-order-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.confirmed-order-card {
+  border: 1px solid var(--black);
+  background: var(--white);
+  padding: 18px;
+}
+
+.confirmed-order-top {
+  border-bottom: 1px solid var(--gray-mid);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+}
+
+.confirmed-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 14px 0 0;
+  color: var(--gray-dark);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.confirmed-summary span {
+  border: 1px solid var(--gray-mid);
+  padding: 5px 8px;
+  overflow-wrap: anywhere;
+}
+
 /* Catalogue-style product detail */
 .product-detail-container {
   align-items: start;
@@ -1721,6 +1810,22 @@ footer { background: var(--white); color: var(--black); padding: 50px 50px 24px;
   .admin-order-actions {
     align-items: flex-start;
   }
+
+  .confirmed-page {
+    padding: 34px 20px;
+  }
+
+  .confirmed-toolbar {
+    flex-direction: column;
+  }
+
+  .confirmed-toolbar-actions {
+    justify-content: flex-start;
+  }
+
+  .confirmed-order-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 600px) {
@@ -1777,5 +1882,31 @@ footer { background: var(--white); color: var(--black); padding: 50px 50px 24px;
 
   .admin-table {
     min-width: 560px;
+  }
+
+  .admin-heading-actions,
+  .confirmed-toolbar-actions {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .admin-link-button,
+  .admin-complete-btn {
+    width: 100%;
+  }
+
+  .confirmed-page {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .confirmed-order-top,
+  .confirmed-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .confirmed-order-top {
+    flex-direction: column;
   }
 }

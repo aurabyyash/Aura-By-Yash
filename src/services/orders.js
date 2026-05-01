@@ -1,4 +1,4 @@
-import { restRequest, sendOrderCompletionMail } from '../lib/supabase';
+import { appendConfirmedOrdersToSheet, restRequest, sendOrderCompletionMail } from '../lib/supabase';
 
 const createOrderNumber = () => {
   const date = new Date().toISOString().slice(0, 10).replaceAll('-', '');
@@ -21,6 +21,8 @@ export const fromOrderRow = (row) => ({
   completedAt: row.completed_at ? new Date(row.completed_at).toLocaleString() : '',
   completionEmailSent: Boolean(row.completion_email_sent),
   completionEmailError: row.completion_email_error || '',
+  sheetSyncedAt: row.sheet_synced_at ? new Date(row.sheet_synced_at).toLocaleString() : '',
+  sheetSyncError: row.sheet_sync_error || '',
   paymentProvider: row.payment_provider || '',
   paymentStatus: row.payment_status || '',
   razorpayOrderId: row.razorpay_order_id || '',
@@ -76,6 +78,7 @@ export const completeOrder = async (order) => {
 
   const completedOrder = fromOrderRow(completedRow);
   let mailResult = { sent: false, message: 'Email provider is not configured.' };
+  let sheetResult = { synced: false, message: 'Google Sheets sync is not configured.' };
 
   try {
     mailResult = await sendOrderCompletionMail(completedOrder);
@@ -83,17 +86,69 @@ export const completeOrder = async (order) => {
     mailResult = { sent: false, message: err.message };
   }
 
+  try {
+    sheetResult = await appendConfirmedOrdersToSheet([completedOrder]);
+  } catch (err) {
+    sheetResult = { synced: false, message: err.message };
+  }
+
+  const sheetSynced = isOrderSyncedToSheet(sheetResult, completedOrder.orderNumber);
+
   const [finalRow] = await restRequest(`/orders?order_number=eq.${orderFilter}`, {
     method: 'PATCH',
     body: {
       completion_email_sent: Boolean(mailResult.sent),
       completion_email_error: mailResult.sent ? null : mailResult.message,
+      sheet_synced_at: sheetSynced ? new Date().toISOString() : null,
+      sheet_sync_error: sheetSynced ? null : sheetResult.message,
     },
   });
 
   return {
     order: fromOrderRow(finalRow),
     mail: mailResult,
+    sheet: sheetResult,
+  };
+};
+
+const isOrderSyncedToSheet = (sheetResult, orderNumber) => {
+  const syncedOrderNumbers = sheetResult?.syncedOrderNumbers || [];
+  const skippedOrderNumbers = sheetResult?.skippedOrderNumbers || [];
+  return Boolean(sheetResult?.synced && [...syncedOrderNumbers, ...skippedOrderNumbers].includes(orderNumber));
+};
+
+export const syncConfirmedOrdersToSheet = async (orders) => {
+  const confirmedOrders = orders.filter(order => order.status.toLowerCase() === 'completed');
+
+  if (confirmedOrders.length === 0) {
+    return { orders: [], sheet: { synced: true, message: 'No confirmed orders to sync.' } };
+  }
+
+  let sheetResult;
+
+  try {
+    sheetResult = await appendConfirmedOrdersToSheet(confirmedOrders);
+  } catch (err) {
+    sheetResult = { synced: false, message: err.message, syncedOrderNumbers: [], skippedOrderNumbers: [] };
+  }
+
+  const updatedOrders = await Promise.all(confirmedOrders.map(async (order) => {
+    const orderFilter = encodeURIComponent(order.orderNumber);
+    const sheetSynced = isOrderSyncedToSheet(sheetResult, order.orderNumber);
+    const body = sheetSynced
+      ? { sheet_synced_at: new Date().toISOString(), sheet_sync_error: null }
+      : { sheet_sync_error: sheetResult.message };
+    const [row] = await restRequest(`/orders?order_number=eq.${orderFilter}`, {
+      method: 'PATCH',
+      body,
+    });
+
+    return fromOrderRow(row);
+  }));
+
+  return {
+    orders: updatedOrders,
+    sheet: sheetResult,
   };
 };
 

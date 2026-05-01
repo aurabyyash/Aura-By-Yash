@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { CheckCircle2, Edit2, PlusCircle, Trash2 } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
 import { useAuth } from '../context/AuthContext';
@@ -150,11 +150,9 @@ const Admin = () => {
         currentOrder.orderNumber === order.orderNumber ? result.order : currentOrder
       )));
 
-      if (result.mail.sent) {
-        setDashboardMessage(`Order ${order.orderNumber} moved to completed and mail sent to ${order.customerEmail}.`);
-      } else {
-        setDashboardError(`Order ${order.orderNumber} moved to completed, but mail was not sent: ${result.mail.message}`);
-      }
+      const mailText = result.mail.sent ? `mail sent to ${order.customerEmail}` : `mail not sent: ${result.mail.message}`;
+      const sheetText = result.sheet.synced ? 'saved to the Google Sheet' : `sheet not synced: ${result.sheet.message}`;
+      setDashboardMessage(`Order ${order.orderNumber} moved to completed, ${mailText}, and ${sheetText}.`);
     } catch (err) {
       setDashboardError(err.message);
     } finally {
@@ -165,8 +163,8 @@ const Admin = () => {
   const recentOrders = orders.filter(order => order.status.toLowerCase() !== 'completed');
   const completedOrders = orders.filter(order => order.status.toLowerCase() === 'completed');
 
-  const renderOrderCard = (order, isCompleted = false) => (
-    <article key={order.orderNumber} className={`admin-order ${isCompleted ? 'is-completed' : ''}`}>
+  const renderOrderCard = (order) => (
+    <article key={order.orderNumber} className="admin-order">
       <div className="admin-order-top">
         <div>
           <p className="admin-order-id">{order.orderNumber}</p>
@@ -177,27 +175,22 @@ const Admin = () => {
         </div>
         <div className="admin-order-actions">
           <span className="admin-order-status">{order.status}</span>
-          {!isCompleted && (
-            <button
-              className="admin-complete-btn"
-              type="button"
-              onClick={() => handleCompleteOrder(order)}
-              disabled={completingOrder === order.orderNumber}
-              title="Mark order packed and ready to ship"
-            >
-              <CheckCircle2 size={16} />
-              {completingOrder === order.orderNumber ? 'Saving' : 'Complete'}
-            </button>
-          )}
+          <button
+            className="admin-complete-btn"
+            type="button"
+            onClick={() => handleCompleteOrder(order)}
+            disabled={completingOrder === order.orderNumber}
+            title="Mark order packed and ready to ship"
+          >
+            <CheckCircle2 size={16} />
+            {completingOrder === order.orderNumber ? 'Saving' : 'Complete'}
+          </button>
         </div>
       </div>
 
       <div className="admin-payment-meta">
         <span>{order.paymentStatus ? `Payment: ${order.paymentStatus}` : 'Payment: Not recorded'}</span>
         {order.razorpayPaymentId && <span>ID: {order.razorpayPaymentId}</span>}
-        {isCompleted && (
-          <span>{order.completionEmailSent ? 'Mail: Sent' : `Mail: ${order.completionEmailError || 'Pending setup'}`}</span>
-        )}
       </div>
 
       <div className="admin-order-items">
@@ -231,7 +224,12 @@ const Admin = () => {
             <p className="section-eyebrow">Customer Activity</p>
             <h3>Recent Orders</h3>
           </div>
-          <span>{recentOrders.length} Active</span>
+          <div className="admin-heading-actions">
+            <span>{recentOrders.length} Active</span>
+            <Link className="admin-link-button" to="/admin/confirmed-orders">
+              Confirmed Orders ({completedOrders.length})
+            </Link>
+          </div>
         </div>
 
         {recentOrders.length === 0 ? (
@@ -239,24 +237,6 @@ const Admin = () => {
         ) : (
           <div className="admin-order-list">
             {recentOrders.map(order => renderOrderCard(order))}
-          </div>
-        )}
-      </section>
-
-      <section className="admin-orders">
-        <div className="admin-section-heading">
-          <div>
-            <p className="section-eyebrow">Order Complete</p>
-            <h3>Confirmed Orders</h3>
-          </div>
-          <span>{completedOrders.length} Completed</span>
-        </div>
-
-        {completedOrders.length === 0 ? (
-          <div className="admin-empty">No completed orders yet.</div>
-        ) : (
-          <div className="admin-order-list">
-            {completedOrders.map(order => renderOrderCard(order, true))}
           </div>
         )}
       </section>
