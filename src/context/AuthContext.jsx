@@ -8,6 +8,7 @@ import {
   refreshSession,
   resendSignupConfirmation,
   signInWithPassword,
+  signInWithOAuthProvider,
   signOut,
   signUpCustomer,
   storeSession,
@@ -110,6 +111,10 @@ export const AuthProvider = ({ children }) => {
     return result;
   }, []);
 
+  const loginWithProvider = useCallback((provider) => {
+    signInWithOAuthProvider(provider);
+  }, []);
+
   const logout = useCallback(async () => {
     await signOut(session);
     setSession(null);
@@ -129,13 +134,14 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
+    loginWithProvider,
     signup,
     logout,
     resendConfirmation,
     isAuthenticated: Boolean(user),
     isAdmin: user?.role === 'admin',
     isEmailConfirmed: Boolean(user?.emailConfirmed),
-  }), [session, user, loading, login, signup, logout, resendConfirmation]);
+  }), [session, user, loading, login, loginWithProvider, signup, logout, resendConfirmation]);
 
   return (
     <AuthContext.Provider value={value}>

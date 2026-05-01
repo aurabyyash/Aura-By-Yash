@@ -67,7 +67,7 @@ const friendlySupabaseError = (message) => {
   }
 
   if (message.includes("Could not find the table 'public.site_assets'")) {
-    return 'Supabase setup is incomplete: run the latest schema migration so homepage front images can be saved.';
+    return 'Supabase setup is incomplete: run the latest schema migration so homepage front media can be saved.';
   }
 
   if (message.includes("'image_urls'") && message.includes('schema cache')) {
@@ -108,6 +108,7 @@ const request = async (path, options = {}, session = null) => {
   const response = await fetch(`${SUPABASE_URL}${path}`, {
     method: options.method || 'GET',
     headers,
+    cache: options.cache,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
@@ -186,6 +187,18 @@ export const signInWithPassword = async ({ email, password }) => {
 
   storeSession(session);
   return session;
+};
+
+export const signInWithOAuthProvider = (provider) => {
+  requireConfig();
+
+  const redirectTo = `${window.location.origin}/login`;
+  const params = new URLSearchParams({
+    provider,
+    redirect_to: redirectTo,
+  });
+
+  window.location.assign(`${SUPABASE_URL}/auth/v1/authorize?${params.toString()}`);
 };
 
 export const refreshSession = async (session) => {
@@ -311,11 +324,11 @@ export const publicStorageUrl = (path) => {
   return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${encodeStoragePath(path)}`;
 };
 
-const uploadStorageImage = async ({ file, folder, index, failureMessage }, session = getStoredSession()) => {
+const uploadStorageMedia = async ({ file, folder, index, failureMessage }, session = getStoredSession()) => {
   requireConfig();
 
   if (!session?.access_token) {
-    throw new Error('Sign in as admin before uploading images.');
+    throw new Error('Sign in as admin before uploading media.');
   }
 
   const extension = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
@@ -336,14 +349,14 @@ const uploadStorageImage = async ({ file, folder, index, failureMessage }, sessi
   if (!response.ok) {
     const text = await response.text();
     const data = text ? JSON.parse(text) : null;
-    throw new Error(friendlySupabaseError(data?.message || failureMessage || 'Image upload failed.'));
+    throw new Error(friendlySupabaseError(data?.message || failureMessage || 'Media upload failed.'));
   }
 
   return publicStorageUrl(path);
 };
 
 export const uploadProductImage = async ({ file, productId, index }, session = getStoredSession()) => (
-  uploadStorageImage({
+  uploadStorageMedia({
     file,
     folder: productId,
     index,
@@ -361,38 +374,43 @@ export const uploadProductImages = async ({ files, productId }, session = getSto
   return Promise.all(fileList.map((file, index) => uploadProductImage({ file, productId, index }, session)));
 };
 
-export const getFrontImages = async () => {
+export const getFrontMedia = async () => {
   const rows = await restRequest(`/site_assets?key=eq.${encodeURIComponent(FRONT_IMAGE_KEY)}&select=image_urls`, {
+    cache: 'no-store',
     headers: { Prefer: '' },
   });
 
   return Array.isArray(rows?.[0]?.image_urls) ? rows[0].image_urls : [];
 };
 
-export const saveFrontImages = async (imageUrls) => {
+export const saveFrontMedia = async (mediaUrls) => {
   const rows = await restRequest('/site_assets?on_conflict=key', {
     method: 'POST',
     prefer: 'resolution=merge-duplicates,return=representation',
     body: {
       key: FRONT_IMAGE_KEY,
-      image_urls: Array.from(new Set((imageUrls || []).filter(Boolean))),
+      image_urls: Array.from(new Set((mediaUrls || []).filter(Boolean))),
     },
   });
 
   return Array.isArray(rows?.[0]?.image_urls) ? rows[0].image_urls : [];
 };
 
-export const uploadFrontImages = async ({ files }, session = getStoredSession()) => {
+export const uploadFrontMedia = async ({ files }, session = getStoredSession()) => {
   const fileList = Array.from(files || []);
 
   if (fileList.length === 0) {
     return [];
   }
 
-  return Promise.all(fileList.map((file, index) => uploadStorageImage({
+  return Promise.all(fileList.map((file, index) => uploadStorageMedia({
     file,
     folder: FRONT_IMAGE_KEY,
     index,
-    failureMessage: 'Front image upload failed.',
+    failureMessage: 'Front media upload failed.',
   }, session)));
 };
+
+export const getFrontImages = getFrontMedia;
+export const saveFrontImages = saveFrontMedia;
+export const uploadFrontImages = uploadFrontMedia;

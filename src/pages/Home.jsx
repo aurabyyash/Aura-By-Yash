@@ -1,22 +1,30 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bookmark, MapPin, Menu, Search, ShoppingCart, User } from 'lucide-react';
+import { Bookmark, MapPin, Menu, Search, ShoppingCart, User, X } from 'lucide-react';
 import { categories } from '../data/products';
 import { useProducts } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import ProductArt from '../components/ProductArt';
-import { getFrontImages } from '../lib/supabase';
+import { getFrontMedia } from '../lib/supabase';
+
+const videoMediaPattern = /\.(mp4|webm|ogg|ogv|mov|m4v)(\?|#|$)/i;
+const isVideoMedia = (url = '') => videoMediaPattern.test(url);
 
 const Home = () => {
   const navigate = useNavigate();
   const { addToCart, cartCount } = useCart();
+  const { isAdmin, isAuthenticated } = useAuth();
   const { products } = useProducts();
   const observerRef = useRef(null);
-  const [frontImages, setFrontImages] = useState([]);
-  const [frontImageIndex, setFrontImageIndex] = useState(0);
+  const [frontMedia, setFrontMedia] = useState([]);
+  const [frontMediaIndex, setFrontMediaIndex] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const latestDrops = products.filter(p => p.isNew || p.isHot || p.isLtd).slice(0, 6);
-  const activeFrontImage = frontImages[frontImageIndex % Math.max(frontImages.length, 1)];
+  const activeFrontMediaIndex = frontMedia.length > 0 ? frontMediaIndex % frontMedia.length : 0;
+  const activeFrontMedia = frontMedia[activeFrontMediaIndex];
+  const activeFrontMediaIsVideo = isVideoMedia(activeFrontMedia);
 
   useEffect(() => {
     observerRef.current = new IntersectionObserver((entries) => {
@@ -35,33 +43,75 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    getFrontImages()
-      .then(setFrontImages)
-      .catch((err) => console.error('Error loading front images:', err));
+    getFrontMedia()
+      .then(setFrontMedia)
+      .catch((err) => console.error('Error loading front media:', err));
   }, []);
 
   useEffect(() => {
-    if (frontImages.length < 2) return undefined;
+    if (frontMedia.length < 2) return undefined;
 
     const rotation = window.setInterval(() => {
-      setFrontImageIndex(currentIndex => (currentIndex + 1) % frontImages.length);
+      setFrontMediaIndex(currentIndex => (currentIndex + 1) % frontMedia.length);
     }, 5500);
 
     return () => window.clearInterval(rotation);
-  }, [frontImages.length]);
+  }, [frontMedia.length]);
+
+  const goTo = (path) => {
+    setMenuOpen(false);
+    navigate(path);
+  };
+
+  const scrollToCategories = () => {
+    setMenuOpen(false);
+    document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   return (
     <>
-      <section
-        className={`hero front-hero${activeFrontImage ? ' has-front-image' : ''}`}
-        style={activeFrontImage ? {
-          backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 30%, rgba(0,0,0,0.28) 100%), url("${activeFrontImage}")`,
-        } : undefined}
-      >
+      <section className={`hero front-hero${activeFrontMedia ? ' has-front-media' : ''}${activeFrontMediaIsVideo ? ' has-front-video' : ''}${activeFrontMedia && !activeFrontMediaIsVideo ? ' has-front-image' : ''}`}>
+        {frontMedia.length > 0 && (
+          <div className="front-hero-slides" aria-hidden="true">
+            {frontMedia.map((mediaUrl, index) => {
+              const mediaIsVideo = isVideoMedia(mediaUrl);
+              const isActive = index === activeFrontMediaIndex;
+
+              return (
+                <div
+                  className={`front-hero-slide${isActive ? ' active' : ''}${mediaIsVideo ? ' is-video' : ' is-image'}`}
+                  key={mediaUrl}
+                >
+                  {mediaIsVideo ? (
+                    <video
+                      className="front-hero-media"
+                      src={mediaUrl}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      preload="metadata"
+                    />
+                  ) : (
+                    <img
+                      className="front-hero-media"
+                      src={mediaUrl}
+                      alt=""
+                      loading={isActive ? 'eager' : 'lazy'}
+                      decoding="async"
+                      fetchPriority={isActive ? 'high' : 'auto'}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <div className="front-hero-nav">
           <div className="front-hero-links" aria-label="Featured navigation">
-            <button type="button" onClick={() => navigate('/all-products')}>New in</button>
-            <button type="button" onClick={() => document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth' })}>Collections</button>
+            <button type="button" onClick={() => goTo('/all-products')}>New in</button>
+            <button type="button" onClick={scrollToCategories}>Collections</button>
           </div>
 
           <Link className="front-hero-logo" to="/" aria-label="Aura By Yash home">
@@ -77,9 +127,34 @@ const Home = () => {
               <ShoppingCart size={22} />
               {cartCount > 0 && <span className="front-cart-count">{cartCount}</span>}
             </Link>
-            <button type="button" className="front-menu-btn" aria-label="Menu"><Menu size={26} /></button>
+            <button
+              type="button"
+              className="front-menu-btn"
+              aria-label={menuOpen ? 'Close menu' : 'Menu'}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(current => !current)}
+            >
+              {menuOpen ? <X size={24} /> : <Menu size={26} />}
+            </button>
           </div>
         </div>
+
+        {menuOpen && (
+          <>
+            <button className="front-menu-backdrop" type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)} />
+            <nav className="front-menu-panel" aria-label="Homepage menu">
+              <button type="button" onClick={() => goTo('/all-products')}>Shop All</button>
+              <button type="button" onClick={scrollToCategories}>Collections</button>
+              <button type="button" onClick={() => goTo('/category/necklaces')}>Necklaces</button>
+              <button type="button" onClick={() => goTo('/category/rings')}>Rings</button>
+              <button type="button" onClick={() => goTo('/category/bracelets')}>Bracelets</button>
+              <button type="button" onClick={() => goTo('/category/earrings')}>Earrings</button>
+              <button type="button" onClick={() => goTo('/cart')}>Cart ({cartCount})</button>
+              {isAdmin && <button type="button" onClick={() => goTo('/admin')}>Admin Panel</button>}
+              {!isAuthenticated && <button type="button" onClick={() => goTo('/login')}>Login</button>}
+            </nav>
+          </>
+        )}
 
         <div className="front-hero-fallback" aria-hidden="true">
           <span>Aura</span>
@@ -89,15 +164,15 @@ const Home = () => {
           Shop now
         </button>
 
-        {frontImages.length > 1 && (
-          <div className="front-hero-dots" aria-label="Front image slides">
-            {frontImages.map((imageUrl, index) => (
+        {frontMedia.length > 1 && (
+          <div className="front-hero-dots" aria-label="Front media slides">
+            {frontMedia.map((mediaUrl, index) => (
               <button
-                key={imageUrl}
+                key={mediaUrl}
                 type="button"
-                className={index === frontImageIndex ? 'active' : ''}
-                aria-label={`Show front image ${index + 1}`}
-                onClick={() => setFrontImageIndex(index)}
+                className={index === activeFrontMediaIndex ? 'active' : ''}
+                aria-label={`Show front media ${index + 1}`}
+                onClick={() => setFrontMediaIndex(index)}
               />
             ))}
           </div>

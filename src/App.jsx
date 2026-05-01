@@ -15,9 +15,10 @@ import { AuthProvider } from './context/AuthContext';
 const AppShell = () => {
   const location = useLocation();
   const isHome = location.pathname === '/';
+  const isLogin = location.pathname === '/login';
 
   return (
-    <div className={`app-container${isHome ? ' is-home' : ''}`}>
+    <div className={`app-container${isHome ? ' is-home' : ''}${isLogin ? ' is-login' : ''}`}>
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />

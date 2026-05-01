@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { completeOrder, listOrders } from '../utils/orders';
 import { listCustomers } from '../services/profiles';
 import ProductArt from '../components/ProductArt';
-import { getFrontImages, saveFrontImages, uploadFrontImages, uploadProductImages } from '../lib/supabase';
+import { getFrontMedia, saveFrontMedia, uploadFrontMedia, uploadProductImages } from '../lib/supabase';
 
 const emptyProduct = {
   id: '',
@@ -25,6 +25,8 @@ const emptyProduct = {
 };
 
 const formatCurrency = (value) => `Rs. ${Number(value || 0).toLocaleString('en-IN')}`;
+const videoMediaPattern = /\.(mp4|webm|ogg|ogv|mov|m4v)(\?|#|$)/i;
+const isVideoMedia = (source = '', type = '') => type.startsWith('video/') || videoMediaPattern.test(source);
 
 const Admin = () => {
   const { isAdmin, loading: authLoading } = useAuth();
@@ -36,7 +38,7 @@ const Admin = () => {
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState(emptyProduct);
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [frontImages, setFrontImages] = useState([]);
+  const [frontMedia, setFrontMedia] = useState([]);
   const [selectedFrontFiles, setSelectedFrontFiles] = useState([]);
   const [savingProduct, setSavingProduct] = useState(false);
   const [savingFrontImages, setSavingFrontImages] = useState(false);
@@ -47,15 +49,15 @@ const Admin = () => {
       if (!isAdmin) return;
 
       try {
-        const [nextOrders, nextCustomers, nextFrontImages] = await Promise.all([
+        const [nextOrders, nextCustomers, nextFrontMedia] = await Promise.all([
           listOrders(),
           listCustomers(),
-          getFrontImages(),
+          getFrontMedia(),
         ]);
 
         setOrders(nextOrders);
         setCustomers(nextCustomers);
-        setFrontImages(nextFrontImages);
+        setFrontMedia(nextFrontMedia);
         setDashboardError('');
         setDashboardMessage('');
       } catch (err) {
@@ -143,11 +145,11 @@ const Admin = () => {
     setDashboardMessage('');
 
     try {
-      const uploadedUrls = await uploadFrontImages({ files: selectedFrontFiles });
-      const nextImages = await saveFrontImages([...frontImages, ...uploadedUrls]);
-      setFrontImages(nextImages);
+      const uploadedUrls = await uploadFrontMedia({ files: selectedFrontFiles });
+      const nextMedia = await saveFrontMedia([...frontMedia, ...uploadedUrls]);
+      setFrontMedia(nextMedia);
       setSelectedFrontFiles([]);
-      setDashboardMessage('Front image updated. The homepage will use the latest uploaded image set.');
+      setDashboardMessage('Front media updated. The homepage will use the latest uploaded media set.');
     } catch (err) {
       setDashboardError(err.message);
     } finally {
@@ -161,9 +163,9 @@ const Admin = () => {
     setDashboardMessage('');
 
     try {
-      const nextImages = await saveFrontImages(frontImages.filter(url => url !== imageUrl));
-      setFrontImages(nextImages);
-      setDashboardMessage('Front image removed from the homepage.');
+      const nextMedia = await saveFrontMedia(frontMedia.filter(url => url !== imageUrl));
+      setFrontMedia(nextMedia);
+      setDashboardMessage('Front media removed from the homepage.');
     } catch (err) {
       setDashboardError(err.message);
     } finally {
@@ -206,6 +208,14 @@ const Admin = () => {
 
   const recentOrders = orders.filter(order => order.status.toLowerCase() !== 'completed');
   const completedOrders = orders.filter(order => order.status.toLowerCase() === 'completed');
+
+  const renderFrontMediaPreview = (source, alt, type = '') => (
+    isVideoMedia(source, type) ? (
+      <video src={source} muted playsInline controls preload="metadata" />
+    ) : (
+      <img src={source} alt={alt} />
+    )
+  );
 
   const renderOrderCard = (order) => (
     <article key={order.orderNumber} className="admin-order">
@@ -266,39 +276,43 @@ const Admin = () => {
         <div className="admin-section-heading">
           <div>
             <p className="section-eyebrow">Homepage</p>
-            <h3>Front Image</h3>
+            <h3>Front Media</h3>
           </div>
-          <span>{frontImages.length} Live</span>
+          <span>{frontMedia.length} Live</span>
         </div>
 
         <form className="admin-front-form" onSubmit={handleSaveFrontImages}>
           <label className="admin-upload-field">
-            <span>Upload Front Image</span>
-            <input type="file" accept="image/*" multiple onChange={handleFrontImageFiles} />
+            <span>Upload Front Image or Video</span>
+            <input type="file" accept="image/*,video/*" multiple onChange={handleFrontImageFiles} />
           </label>
 
-          {(frontImages.length > 0 || selectedFrontFiles.length > 0) && (
+          {(frontMedia.length > 0 || selectedFrontFiles.length > 0) && (
             <div className="admin-front-preview-grid">
-              {frontImages.map(imageUrl => (
-                <div className="admin-image-preview admin-front-preview" key={imageUrl}>
-                  <img src={imageUrl} alt="Homepage front" />
-                  <button type="button" onClick={() => handleRemoveFrontImage(imageUrl)} disabled={savingFrontImages}>
+              {frontMedia.map(mediaUrl => (
+                <div className="admin-image-preview admin-front-preview" key={mediaUrl}>
+                  {renderFrontMediaPreview(mediaUrl, 'Homepage front media')}
+                  <button type="button" onClick={() => handleRemoveFrontImage(mediaUrl)} disabled={savingFrontImages}>
                     Remove
                   </button>
                 </div>
               ))}
-              {selectedFrontFiles.map(file => (
-                <div className="admin-image-preview admin-front-preview" key={`${file.name}-${file.lastModified}`}>
-                  <img src={URL.createObjectURL(file)} alt={file.name} />
-                  <span>New</span>
-                </div>
-              ))}
+              {selectedFrontFiles.map(file => {
+                const previewUrl = URL.createObjectURL(file);
+
+                return (
+                  <div className="admin-image-preview admin-front-preview" key={`${file.name}-${file.lastModified}`}>
+                    {renderFrontMediaPreview(previewUrl, file.name, file.type)}
+                    <span>New</span>
+                  </div>
+                );
+              })}
             </div>
           )}
 
           <button type="submit" className="btn-dark" disabled={savingFrontImages || selectedFrontFiles.length === 0}>
             <ImagePlus size={16} />
-            {savingFrontImages ? 'Saving...' : 'Save Front Image'}
+            {savingFrontImages ? 'Saving...' : 'Save Front Media'}
           </button>
         </form>
       </section>
